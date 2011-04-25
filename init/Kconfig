@@ -923,6 +923,16 @@ menuconfig EXPERT
           environments which can tolerate a "non-standard" kernel.
           Only use this if you really know what you are doing.
 
+config HW_BREAKPOINT
+	bool "Hardware breakpoints" if EXPERT
+	depends on HAVE_HW_BREAKPOINT
+	default y
+	help
+	  Hardware breakpoints are a feature implemented by most CPUs
+	  to trigger an event when an instruction or data fetch
+	  matches a given pattern. This is typically used by ptrace
+	  and perf events.
+
 config UID16
 	bool "Enable 16-bit UID system calls" if EXPERT
 	depends on ARM || BLACKFIN || CRIS || FRV || H8300 || X86_32 || M68K || (S390 && !64BIT) || SUPERH || SPARC32 || (SPARC64 && COMPAT) || UML || (X86_64 && IA32_EMULATION)
