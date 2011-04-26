@@ -492,7 +492,7 @@ struct perf_guest_info_callbacks {
 	unsigned long			(*get_guest_ip)(void);
 };
 
-#ifdef CONFIG_HAVE_HW_BREAKPOINT
+#ifdef CONFIG_HW_BREAKPOINT
 #include <asm/hw_breakpoint.h>
 #endif
 
@@ -565,7 +565,7 @@ struct hw_perf_event {
 		struct { /* software */
 			struct hrtimer	hrtimer;
 		};
-#ifdef CONFIG_HAVE_HW_BREAKPOINT
+#ifdef CONFIG_HW_BREAKPOINT
 		struct { /* breakpoint */
 			struct arch_hw_breakpoint	info;
 			struct list_head		bp_list;

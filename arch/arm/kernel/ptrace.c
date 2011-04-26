@@ -367,7 +367,7 @@ static int ptrace_setcrunchregs(struct task_struct *tsk, void __user *ufp)
 }
 #endif
 
-#ifdef CONFIG_HAVE_HW_BREAKPOINT
+#ifdef CONFIG_HW_BREAKPOINT
 /*
  * Convert a virtual register number into an index for a thread_info
  * breakpoint array. Breakpoints are identified using positive numbers
@@ -896,7 +896,7 @@ long arch_ptrace(struct task_struct *child, long request,
 			break;
 #endif
 
-#ifdef CONFIG_HAVE_HW_BREAKPOINT
+#ifdef CONFIG_HW_BREAKPOINT
 		case PTRACE_GETHBPREGS:
 			if (ptrace_get_breakpoints(child) < 0)
 				return -ESRCH;

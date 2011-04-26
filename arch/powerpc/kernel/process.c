@@ -353,7 +353,7 @@ static void switch_booke_debug_regs(struct thread_struct *new_thread)
 			prime_debug_regs(new_thread);
 }
 #else	/* !CONFIG_PPC_ADV_DEBUG_REGS */
-#ifndef CONFIG_HAVE_HW_BREAKPOINT
+#ifndef CONFIG_HW_BREAKPOINT
 static void set_debug_reg_defaults(struct thread_struct *thread)
 {
 	if (thread->dabr) {
@@ -361,7 +361,7 @@ static void set_debug_reg_defaults(struct thread_struct *thread)
 		set_dabr(0);
 	}
 }
-#endif /* !CONFIG_HAVE_HW_BREAKPOINT */
+#endif /* !CONFIG_HW_BREAKPOINT */
 #endif	/* CONFIG_PPC_ADV_DEBUG_REGS */
 
 int set_dabr(unsigned long dabr)
@@ -472,10 +472,10 @@ struct task_struct *__switch_to(struct task_struct *prev,
  * For PPC_BOOK3S_64, we use the hw-breakpoint interfaces that would
  * schedule DABR
  */
-#ifndef CONFIG_HAVE_HW_BREAKPOINT
+#ifndef CONFIG_HW_BREAKPOINT
 	if (unlikely(__get_cpu_var(current_dabr) != new->thread.dabr))
 		set_dabr(new->thread.dabr);
-#endif /* CONFIG_HAVE_HW_BREAKPOINT */
+#endif /* CONFIG_HW_BREAKPOINT */
 #endif
 
 
@@ -693,11 +693,11 @@ void flush_thread(void)
 {
 	discard_lazy_cpu_state();
 
-#ifdef CONFIG_HAVE_HW_BREAKPOINT
+#ifdef CONFIG_HW_BREAKPOINT
 	flush_ptrace_hw_breakpoint(current);
-#else /* CONFIG_HAVE_HW_BREAKPOINT */
+#else /* CONFIG_HW_BREAKPOINT */
 	set_debug_reg_defaults(&current->thread);
-#endif /* CONFIG_HAVE_HW_BREAKPOINT */
+#endif /* CONFIG_HW_BREAKPOINT */
 }
 
 void
@@ -715,9 +715,9 @@ void prepare_to_copy(struct task_struct *tsk)
 	flush_altivec_to_thread(current);
 	flush_vsx_to_thread(current);
 	flush_spe_to_thread(current);
-#ifdef CONFIG_HAVE_HW_BREAKPOINT
+#ifdef CONFIG_HW_BREAKPOINT
 	flush_ptrace_hw_breakpoint(tsk);
-#endif /* CONFIG_HAVE_HW_BREAKPOINT */
+#endif /* CONFIG_HW_BREAKPOINT */
 }
 
 /*
