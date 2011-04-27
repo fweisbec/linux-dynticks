@@ -926,6 +926,7 @@ menuconfig EXPERT
 config HW_BREAKPOINT
 	bool "Hardware breakpoints" if EXPERT
 	depends on HAVE_HW_BREAKPOINT
+	select PERF_EVENTS
 	default y
 	help
 	  Hardware breakpoints are a feature implemented by most CPUs
