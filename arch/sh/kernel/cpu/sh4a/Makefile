@@ -46,4 +46,4 @@ obj-y					+= $(clock-y)
 obj-$(CONFIG_SMP)			+= $(smp-y)
 obj-$(CONFIG_GENERIC_GPIO)		+= $(pinmux-y)
 obj-$(CONFIG_PERF_EVENTS)		+= perf_event.o
-obj-$(CONFIG_HAVE_HW_BREAKPOINT)	+= ubc.o
+obj-$(CONFIG_HW_BREAKPOINT)	+= ubc.o

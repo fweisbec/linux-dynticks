@@ -925,7 +925,7 @@ asmlinkage long compat_sys_ptrace(compat_long_t request, compat_long_t pid,
 }
 #endif	/* CONFIG_COMPAT */
 
-#ifdef CONFIG_HAVE_HW_BREAKPOINT
+#ifdef CONFIG_HW_BREAKPOINT
 int ptrace_get_breakpoints(struct task_struct *tsk)
 {
 	if (atomic_inc_not_zero(&tsk->ptrace_bp_refcnt))
@@ -939,4 +939,4 @@ void ptrace_put_breakpoints(struct task_struct *tsk)
 	if (atomic_dec_and_test(&tsk->ptrace_bp_refcnt))
 		flush_ptrace_hw_breakpoint(tsk);
 }
-#endif /* CONFIG_HAVE_HW_BREAKPOINT */
+#endif /* CONFIG_HW_BREAKPOINT */

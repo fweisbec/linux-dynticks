@@ -171,7 +171,7 @@
 	@ we can access the debug registers safely.
 	@
 	.macro	debug_entry, fsr
-#if defined(CONFIG_HAVE_HW_BREAKPOINT) && defined(CONFIG_PREEMPT)
+#if defined(CONFIG_HW_BREAKPOINT) && defined(CONFIG_PREEMPT)
 	ldr	r4, =0x40f		@ mask out fsr.fs
 	and	r5, r4, \fsr
 	cmp	r5, #2			@ debug exception

@@ -24,7 +24,7 @@
 #define _PPC_BOOK3S_64_HW_BREAKPOINT_H
 
 #ifdef	__KERNEL__
-#ifdef CONFIG_HAVE_HW_BREAKPOINT
+#ifdef CONFIG_HW_BREAKPOINT
 
 struct arch_hw_breakpoint {
 	bool		extraneous_interrupt;
@@ -57,7 +57,7 @@ void hw_breakpoint_pmu_read(struct perf_event *bp);
 extern void flush_ptrace_hw_breakpoint(struct task_struct *tsk);
 
 extern struct pmu perf_ops_bp;
-extern void ptrace_triggered(struct perf_event *bp, int nmi,
+extern void ptrace_triggered(struct perf_event *bp,
 			struct perf_sample_data *data, struct pt_regs *regs);
 static inline void hw_breakpoint_disable(void)
 {
@@ -65,10 +65,10 @@ static inline void hw_breakpoint_disable(void)
 }
 extern void thread_change_pc(struct task_struct *tsk, struct pt_regs *regs);
 
-#else	/* CONFIG_HAVE_HW_BREAKPOINT */
+#else	/* CONFIG_HW_BREAKPOINT */
 static inline void hw_breakpoint_disable(void) { }
 static inline void thread_change_pc(struct task_struct *tsk,
 					struct pt_regs *regs) { }
-#endif	/* CONFIG_HAVE_HW_BREAKPOINT */
+#endif	/* CONFIG_HW_BREAKPOINT */
 #endif	/* __KERNEL__ */
 #endif	/* _PPC_BOOK3S_64_HW_BREAKPOINT_H */

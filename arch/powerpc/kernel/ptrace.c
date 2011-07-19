@@ -881,8 +881,8 @@ void user_disable_single_step(struct task_struct *task)
 	clear_tsk_thread_flag(task, TIF_SINGLESTEP);
 }
 
-#ifdef CONFIG_HAVE_HW_BREAKPOINT
-void ptrace_triggered(struct perf_event *bp, int nmi,
+#ifdef CONFIG_HW_BREAKPOINT
+void ptrace_triggered(struct perf_event *bp,
 		      struct perf_sample_data *data, struct pt_regs *regs)
 {
 	struct perf_event_attr attr;
@@ -897,17 +897,17 @@ void ptrace_triggered(struct perf_event *bp, int nmi,
 	attr.disabled = true;
 	modify_user_hw_breakpoint(bp, &attr);
 }
-#endif /* CONFIG_HAVE_HW_BREAKPOINT */
+#endif /* CONFIG_HW_BREAKPOINT */
 
 int ptrace_set_debugreg(struct task_struct *task, unsigned long addr,
 			       unsigned long data)
 {
-#ifdef CONFIG_HAVE_HW_BREAKPOINT
+#ifdef CONFIG_HW_BREAKPOINT
 	int ret;
 	struct thread_struct *thread = &(task->thread);
 	struct perf_event *bp;
 	struct perf_event_attr attr;
-#endif /* CONFIG_HAVE_HW_BREAKPOINT */
+#endif /* CONFIG_HW_BREAKPOINT */
 
 	/* For ppc64 we support one DABR and no IABR's at the moment (ppc64).
 	 *  For embedded processors we support one DAC and no IAC's at the
@@ -936,7 +936,8 @@ int ptrace_set_debugreg(struct task_struct *task, unsigned long addr,
 	/* Ensure breakpoint translation bit is set */
 	if (data && !(data & DABR_TRANSLATION))
 		return -EIO;
-#ifdef CONFIG_HAVE_HW_BREAKPOINT
+
+#ifdef CONFIG_HW_BREAKPOINT
 	if (ptrace_get_breakpoints(task) < 0)
 		return -ESRCH;
 
@@ -973,7 +974,7 @@ int ptrace_set_debugreg(struct task_struct *task, unsigned long addr,
 								&attr.bp_type);
 
 	thread->ptrace_bps[0] = bp = register_user_hw_breakpoint(&attr,
-							ptrace_triggered, task);
+					       ptrace_triggered, NULL, task);
 	if (IS_ERR(bp)) {
 		thread->ptrace_bps[0] = NULL;
 		ptrace_put_breakpoints(task);
@@ -982,7 +983,7 @@ int ptrace_set_debugreg(struct task_struct *task, unsigned long addr,
 
 	ptrace_put_breakpoints(task);
 
-#endif /* CONFIG_HAVE_HW_BREAKPOINT */
+#endif /* CONFIG_HW_BREAKPOINT */
 
 	/* Move contents to the DABR register */
 	task->thread.dabr = data;

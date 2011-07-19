@@ -30,7 +30,7 @@
 #endif
 
 struct debug_info {
-#ifdef CONFIG_HAVE_HW_BREAKPOINT
+#ifdef CONFIG_HW_BREAKPOINT
 	struct perf_event	*hbp[ARM_MAX_HBP_SLOTS];
 #endif
 };

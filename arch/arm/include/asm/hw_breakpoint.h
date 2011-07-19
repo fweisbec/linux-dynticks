@@ -5,7 +5,7 @@
 
 struct task_struct;
 
-#ifdef CONFIG_HAVE_HW_BREAKPOINT
+#ifdef CONFIG_HW_BREAKPOINT
 
 struct arch_hw_breakpoint_ctrl {
 		u32 __reserved	: 9,
@@ -128,6 +128,6 @@ int hw_breakpoint_slots(int type);
 #else
 static inline void clear_ptrace_hw_breakpoint(struct task_struct *tsk) {}
 
-#endif	/* CONFIG_HAVE_HW_BREAKPOINT */
+#endif	/* CONFIG_HW_BREAKPOINT */
 #endif	/* __KERNEL__ */
 #endif	/* _ARM_HW_BREAKPOINT_H */

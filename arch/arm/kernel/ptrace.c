@@ -367,7 +367,7 @@ static int ptrace_setcrunchregs(struct task_struct *tsk, void __user *ufp)
 }
 #endif
 
-#ifdef CONFIG_HAVE_HW_BREAKPOINT
+#ifdef CONFIG_HW_BREAKPOINT
 /*
  * Convert a virtual register number into an index for a thread_info
  * breakpoint array. Breakpoints are identified using positive numbers
@@ -396,7 +396,7 @@ static long ptrace_hbp_idx_to_num(int idx)
 /*
  * Handle hitting a HW-breakpoint.
  */
-static void ptrace_hbptriggered(struct perf_event *bp, int unused,
+static void ptrace_hbptriggered(struct perf_event *bp,
 				     struct perf_sample_data *data,
 				     struct pt_regs *regs)
 {
@@ -479,7 +479,8 @@ static struct perf_event *ptrace_hbp_create(struct task_struct *tsk, int type)
 	attr.bp_type	= type;
 	attr.disabled	= 1;
 
-	return register_user_hw_breakpoint(&attr, ptrace_hbptriggered, tsk);
+	return register_user_hw_breakpoint(&attr, ptrace_hbptriggered, NULL,
+					   tsk);
 }
 
 static int ptrace_gethbpregs(struct task_struct *tsk, long num,
@@ -895,7 +896,7 @@ long arch_ptrace(struct task_struct *child, long request,
 			break;
 #endif
 
-#ifdef CONFIG_HAVE_HW_BREAKPOINT
+#ifdef CONFIG_HW_BREAKPOINT
 		case PTRACE_GETHBPREGS:
 			if (ptrace_get_breakpoints(child) < 0)
 				return -ESRCH;

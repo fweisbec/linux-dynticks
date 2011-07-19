@@ -78,8 +78,6 @@
  */
 #ifdef __KERNEL__
 
-DECLARE_PER_CPU(unsigned long, cpu_dr7);
-
 static inline void hw_breakpoint_disable(void)
 {
 	/* Zero the control register for HW Breakpoint */
@@ -92,6 +90,10 @@ static inline void hw_breakpoint_disable(void)
 	set_debugreg(0UL, 3);
 }
 
+#ifdef CONFIG_HW_BREAKPOINT
+
+DECLARE_PER_CPU(unsigned long, cpu_dr7);
+
 static inline int hw_breakpoint_active(void)
 {
 	return __this_cpu_read(cpu_dr7) & DR_GLOBAL_ENABLE_MASK;
@@ -100,6 +102,33 @@ static inline int hw_breakpoint_active(void)
 extern void aout_dump_debugregs(struct user *dump);
 
 extern void hw_breakpoint_restore(void);
+#else
+static inline int hw_breakpoint_active(void)
+{
+	return 0;
+}
+
+static inline void hw_breakpoint_restore(void)
+{
+	set_debugreg(0UL, 0);
+	set_debugreg(0UL, 1);
+	set_debugreg(0UL, 2);
+	set_debugreg(0UL, 3);
+	set_debugreg(current->thread.debugreg6, 6);
+	set_debugreg(0UL, 7);
+}
+
+static inline void aout_dump_debugregs(struct user *dump)
+{
+	int i;
+
+	for (i = 0; i < 6; i++)
+		dump->u_debugreg[i] = 0;
+
+	dump->u_debugreg[6] = current->thread.debugreg6;
+	dump->u_debugreg[7] = 0;
+}
+#endif /* CONFIG_HW_BREAKPOINT */
 
 #endif	/* __KERNEL__ */
 
