@@ -157,7 +157,7 @@ update_ts_time_stats(int cpu, struct tick_sched *ts, ktime_t now, u64 *last_upda
 {
 	ktime_t delta;
 
-	if (ts->idle_active) {
+	if (ts->inidle) {
 		delta = ktime_sub(now, ts->idle_entrytime);
 		ts->idle_sleeptime = ktime_add(ts->idle_sleeptime, delta);
 		if (nr_iowait_cpu(cpu) > 0)
@@ -175,7 +175,6 @@ static void tick_nohz_stop_idle(int cpu, ktime_t now)
 	struct tick_sched *ts = &per_cpu(tick_cpu_sched, cpu);
 
 	update_ts_time_stats(cpu, ts, now, NULL);
-	ts->idle_active = 0;
 
 	sched_clock_idle_wakeup_event(0);
 }
@@ -186,7 +185,6 @@ static ktime_t tick_nohz_start_idle(int cpu, struct tick_sched *ts)
 
 	now = ktime_get();
 	ts->idle_entrytime = now;
-	ts->idle_active = 1;
 	sched_clock_idle_sleep_event();
 	return now;
 }
@@ -502,11 +500,11 @@ void tick_nohz_restart_sched_tick(void)
 	ktime_t now;
 
 	local_irq_disable();
-	if (ts->idle_active || (ts->inidle && ts->tick_stopped))
-		now = ktime_get();
 
-	if (ts->idle_active)
+	if (ts->inidle) {
+		now = ktime_get();
 		tick_nohz_stop_idle(cpu, now);
+	}
 
 	if (!ts->inidle || !ts->tick_stopped) {
 		ts->inidle = 0;
@@ -677,10 +675,10 @@ static inline void tick_check_nohz(int cpu)
 	struct tick_sched *ts = &per_cpu(tick_cpu_sched, cpu);
 	ktime_t now;
 
-	if (!ts->idle_active && !ts->tick_stopped)
+	if (!ts->inidle && !ts->tick_stopped)
 		return;
 	now = ktime_get();
-	if (ts->idle_active)
+	if (ts->inidle)
 		tick_nohz_stop_idle(cpu, now);
 	if (ts->tick_stopped) {
 		tick_nohz_update_jiffies(now);
