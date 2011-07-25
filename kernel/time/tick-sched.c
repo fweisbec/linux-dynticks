@@ -504,15 +504,13 @@ void tick_nohz_restart_sched_tick(void)
 	if (ts->inidle) {
 		now = ktime_get();
 		tick_nohz_stop_idle(cpu, now);
+		ts->inidle = 0;
 	}
 
-	if (!ts->inidle || !ts->tick_stopped) {
-		ts->inidle = 0;
+	if (!ts->tick_stopped) {
 		local_irq_enable();
 		return;
 	}
-
-	ts->inidle = 0;
 
 	rcu_exit_nohz();
 
