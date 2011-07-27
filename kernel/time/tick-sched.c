@@ -385,7 +385,6 @@ static void tick_nohz_stop_sched_tick(ktime_t now)
 			ts->idle_tick = hrtimer_get_expires(&ts->sched_timer);
 			ts->tick_stopped = 1;
 			ts->idle_jiffies = last_jiffies;
-			rcu_enter_nohz();
 		}
 
 		ts->idle_sleeps++;
@@ -429,9 +428,13 @@ out:
 static void __tick_nohz_enter_idle(struct tick_sched *ts, int cpu)
 {
 	ktime_t now;
+	int was_stopped = ts->tick_stopped;
 
 	now = tick_nohz_start_idle(cpu, ts);
 	tick_nohz_stop_sched_tick(now);
+
+	if (!was_stopped && ts->tick_stopped)
+		rcu_enter_nohz();
 }
 
 void tick_nohz_enter_idle(void)
@@ -499,8 +502,6 @@ static void tick_nohz_restart_sched_tick(ktime_t now, struct tick_sched *ts)
 	unsigned long ticks;
 #endif
 
-	rcu_exit_nohz();
-
 	/* Update jiffies first */
 	select_nohz_load_balancer(0);
 	tick_do_update_jiffies64(now);
@@ -547,8 +548,10 @@ void tick_nohz_exit_idle(void)
 	tick_nohz_stop_idle(smp_processor_id(), now);
 	ts->inidle = 0;
 
-	if (ts->tick_stopped)
+	if (ts->tick_stopped) {
+		rcu_exit_nohz();
 		tick_nohz_restart_sched_tick(now, ts);
+	}
 
 	local_irq_enable();
 }
