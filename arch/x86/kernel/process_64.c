@@ -120,7 +120,7 @@ void cpu_idle(void)
 
 	/* endless idle loop with no priority at all */
 	while (1) {
-		tick_nohz_stop_sched_tick(1);
+		tick_nohz_enter_idle();
 		while (!need_resched()) {
 
 			rmb();
@@ -144,8 +144,7 @@ void cpu_idle(void)
 			   loops can be woken up without interrupt. */
 			__exit_idle();
 		}
-
-		tick_nohz_restart_sched_tick();
+		tick_nohz_exit_idle();
 		preempt_enable_no_resched();
 		schedule();
 		preempt_disable();

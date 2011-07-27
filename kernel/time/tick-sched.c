@@ -249,36 +249,17 @@ EXPORT_SYMBOL_GPL(get_cpu_iowait_time_us);
  * Called either from the idle loop or from irq_exit() when an idle period was
  * just interrupted by an interrupt which did not cause a reschedule.
  */
-void tick_nohz_stop_sched_tick(int inidle)
+static void tick_nohz_stop_sched_tick(ktime_t now)
 {
-	unsigned long seq, last_jiffies, next_jiffies, delta_jiffies, flags;
+	unsigned long seq, last_jiffies, next_jiffies, delta_jiffies;
 	struct tick_sched *ts;
-	ktime_t last_update, expires, now;
+	ktime_t last_update, expires;
 	struct clock_event_device *dev = __get_cpu_var(tick_cpu_device).evtdev;
 	u64 time_delta;
 	int cpu;
 
-	local_irq_save(flags);
-
 	cpu = smp_processor_id();
 	ts = &per_cpu(tick_cpu_sched, cpu);
-
-	/*
-	 * Call to tick_nohz_start_idle stops the last_update_time from being
-	 * updated. Thus, it must not be called in the event we are called from
-	 * irq_exit() with the prior state different than idle.
-	 */
-	if (!inidle && !ts->inidle)
-		goto end;
-
-	/*
-	 * Set ts->inidle unconditionally. Even if the system did not
-	 * switch to NOHZ mode the cpu frequency governers rely on the
-	 * update of the idle time accounting in tick_nohz_start_idle().
-	 */
-	ts->inidle = 1;
-
-	now = tick_nohz_start_idle(cpu, ts);
 
 	/*
 	 * If this cpu is offline and it is the one which updates
@@ -293,10 +274,10 @@ void tick_nohz_stop_sched_tick(int inidle)
 	}
 
 	if (unlikely(ts->nohz_mode == NOHZ_MODE_INACTIVE))
-		goto end;
+		return;
 
 	if (need_resched())
-		goto end;
+		return;
 
 	if (unlikely(local_softirq_pending() && cpu_online(cpu))) {
 		static int ratelimit;
@@ -306,7 +287,7 @@ void tick_nohz_stop_sched_tick(int inidle)
 			       (unsigned int) local_softirq_pending());
 			ratelimit++;
 		}
-		goto end;
+		return;
 	}
 
 	ts->idle_calls++;
@@ -443,9 +424,30 @@ out:
 	ts->next_jiffies = next_jiffies;
 	ts->last_jiffies = last_jiffies;
 	ts->sleep_length = ktime_sub(dev->next_event, now);
-end:
-	local_irq_restore(flags);
 }
+
+static void __tick_nohz_enter_idle(struct tick_sched *ts, int cpu)
+{
+	ktime_t now;
+
+	now = tick_nohz_start_idle(cpu, ts);
+	tick_nohz_stop_sched_tick(now);
+}
+
+void tick_nohz_enter_idle(void)
+{
+	struct tick_sched *ts;
+	int cpu;
+
+	local_irq_disable();
+
+	ts = &__get_cpu_var(tick_cpu_sched);
+	ts->inidle = 1;
+	cpu = smp_processor_id();
+	__tick_nohz_enter_idle(ts, cpu);
+
+	local_irq_enable();
+ }
 
 /**
  * tick_nohz_get_sleep_length - return the length of the current sleep
@@ -490,27 +492,12 @@ static void tick_nohz_restart(struct tick_sched *ts, ktime_t now)
  *
  * Restart the idle tick when the CPU is woken up from idle
  */
-void tick_nohz_restart_sched_tick(void)
+static void tick_nohz_restart_sched_tick(ktime_t now, struct tick_sched *ts)
 {
 	int cpu = smp_processor_id();
-	struct tick_sched *ts = &per_cpu(tick_cpu_sched, cpu);
 #ifndef CONFIG_VIRT_CPU_ACCOUNTING
 	unsigned long ticks;
 #endif
-	ktime_t now;
-
-	local_irq_disable();
-
-	if (ts->inidle) {
-		now = ktime_get();
-		tick_nohz_stop_idle(cpu, now);
-		ts->inidle = 0;
-	}
-
-	if (!ts->tick_stopped) {
-		local_irq_enable();
-		return;
-	}
 
 	rcu_exit_nohz();
 
@@ -541,8 +528,37 @@ void tick_nohz_restart_sched_tick(void)
 	ts->idle_exittime = now;
 
 	tick_nohz_restart(ts, now);
+}
+
+void tick_nohz_exit_idle(void)
+{
+	struct tick_sched *ts = &__get_cpu_var(tick_cpu_sched);
+	ktime_t now;
+
+	local_irq_disable();
+
+	if (!ts->inidle) {
+		local_irq_enable();
+		return;
+	}
+
+	now = ktime_get();
+
+	tick_nohz_stop_idle(smp_processor_id(), now);
+	ts->inidle = 0;
+
+	if (ts->tick_stopped)
+		tick_nohz_restart_sched_tick(now, ts);
 
 	local_irq_enable();
+}
+
+void tick_nohz_irq_exit(void)
+{
+	struct tick_sched *ts = &__get_cpu_var(tick_cpu_sched);
+
+	if (ts->inidle)
+		__tick_nohz_enter_idle(ts, smp_processor_id());
 }
 
 static int tick_nohz_reprogram(struct tick_sched *ts, ktime_t now)
