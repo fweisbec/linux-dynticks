@@ -249,48 +249,14 @@ EXPORT_SYMBOL_GPL(get_cpu_iowait_time_us);
  * Called either from the idle loop or from irq_exit() when an idle period was
  * just interrupted by an interrupt which did not cause a reschedule.
  */
-static void tick_nohz_stop_sched_tick(ktime_t now)
+static void tick_nohz_stop_sched_tick(ktime_t now, int cpu, struct tick_sched *ts)
 {
 	unsigned long seq, last_jiffies, next_jiffies, delta_jiffies;
-	struct tick_sched *ts;
 	ktime_t last_update, expires;
 	struct clock_event_device *dev = __get_cpu_var(tick_cpu_device).evtdev;
 	u64 time_delta;
-	int cpu;
 
-	cpu = smp_processor_id();
-	ts = &per_cpu(tick_cpu_sched, cpu);
 
-	/*
-	 * If this cpu is offline and it is the one which updates
-	 * jiffies, then give up the assignment and let it be taken by
-	 * the cpu which runs the tick timer next. If we don't drop
-	 * this here the jiffies might be stale and do_timer() never
-	 * invoked.
-	 */
-	if (unlikely(!cpu_online(cpu))) {
-		if (cpu == tick_do_timer_cpu)
-			tick_do_timer_cpu = TICK_DO_TIMER_NONE;
-	}
-
-	if (unlikely(ts->nohz_mode == NOHZ_MODE_INACTIVE))
-		return;
-
-	if (need_resched())
-		return;
-
-	if (unlikely(local_softirq_pending() && cpu_online(cpu))) {
-		static int ratelimit;
-
-		if (ratelimit < 10) {
-			printk(KERN_ERR "NOHZ: local_softirq_pending %02x\n",
-			       (unsigned int) local_softirq_pending());
-			ratelimit++;
-		}
-		return;
-	}
-
-	ts->idle_calls++;
 	/* Read jiffies and the time when jiffies were updated last */
 	do {
 		seq = read_seqbegin(&xtime_lock);
@@ -422,18 +388,57 @@ out:
 	ts->sleep_length = ktime_sub(dev->next_event, now);
 }
 
+static bool tick_nohz_can_stop_tick(int cpu, struct tick_sched *ts)
+{
+	/*
+	 * If this cpu is offline and it is the one which updates
+	 * jiffies, then give up the assignment and let it be taken by
+	 * the cpu which runs the tick timer next. If we don't drop
+	 * this here the jiffies might be stale and do_timer() never
+	 * invoked.
+	 */
+	if (unlikely(!cpu_online(cpu))) {
+		if (cpu == tick_do_timer_cpu)
+			tick_do_timer_cpu = TICK_DO_TIMER_NONE;
+	}
+
+	if (unlikely(ts->nohz_mode == NOHZ_MODE_INACTIVE))
+		return false;
+
+	if (need_resched())
+		return false;
+
+	if (unlikely(local_softirq_pending() && cpu_online(cpu))) {
+		static int ratelimit;
+
+		if (ratelimit < 10) {
+			printk(KERN_ERR "NOHZ: local_softirq_pending %02x\n",
+			       (unsigned int) local_softirq_pending());
+			ratelimit++;
+		}
+		return false;
+	}
+
+	return true;
+}
+
 static void __tick_nohz_enter_idle(struct tick_sched *ts, int cpu)
 {
 	ktime_t now;
-	int was_stopped = ts->tick_stopped;
 
 	now = tick_nohz_start_idle(cpu, ts);
-	tick_nohz_stop_sched_tick(now);
 
-	if (!was_stopped && ts->tick_stopped) {
-		ts->idle_jiffies = ts->last_jiffies;
-		select_nohz_load_balancer(1);
-		rcu_enter_nohz();
+	if (tick_nohz_can_stop_tick(cpu, ts)) {
+		int was_stopped = ts->tick_stopped;
+
+		ts->idle_calls++;
+		tick_nohz_stop_sched_tick(now, cpu, ts);
+
+		if (!was_stopped && ts->tick_stopped) {
+			ts->idle_jiffies = ts->last_jiffies;
+			select_nohz_load_balancer(1);
+			rcu_enter_nohz();
+		}
 	}
 }
 
