@@ -380,8 +380,6 @@ static void tick_nohz_stop_sched_tick(ktime_t now)
 		 * the scheduler tick in nohz_restart_sched_tick.
 		 */
 		if (!ts->tick_stopped) {
-			select_nohz_load_balancer(1);
-
 			ts->last_tick = hrtimer_get_expires(&ts->sched_timer);
 			ts->tick_stopped = 1;
 		}
@@ -434,6 +432,7 @@ static void __tick_nohz_enter_idle(struct tick_sched *ts, int cpu)
 
 	if (!was_stopped && ts->tick_stopped) {
 		ts->idle_jiffies = ts->last_jiffies;
+		select_nohz_load_balancer(1);
 		rcu_enter_nohz();
 	}
 }
@@ -501,7 +500,6 @@ static void tick_nohz_restart_sched_tick(ktime_t now, struct tick_sched *ts)
 	int cpu = smp_processor_id();
 
 	/* Update jiffies first */
-	select_nohz_load_balancer(0);
 	tick_do_update_jiffies64(now);
 	cpumask_clear_cpu(cpu, nohz_cpu_mask);
 
@@ -552,6 +550,7 @@ void tick_nohz_exit_idle(void)
 
 	if (ts->tick_stopped) {
 		rcu_exit_nohz();
+		select_nohz_load_balancer(0);
 		tick_nohz_restart_sched_tick(now, ts);
 		tick_nohz_account_idle_ticks(ts);
 	}
