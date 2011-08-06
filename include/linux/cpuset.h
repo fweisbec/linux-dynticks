@@ -13,6 +13,7 @@
 #include <linux/nodemask.h>
 #include <linux/cgroup.h>
 #include <linux/mm.h>
+#include <linux/atomic.h>
 
 #ifdef CONFIG_CPUSETS
 
@@ -234,5 +235,35 @@ static inline bool put_mems_allowed(unsigned int seq)
 }
 
 #endif /* !CONFIG_CPUSETS */
+
+#ifdef CONFIG_CPUSETS_NO_HZ
+
+DECLARE_PER_CPU(atomic_t, cpu_adaptive_nohz_ref);
+
+static inline bool cpuset_cpu_adaptive_nohz(int cpu)
+{
+	atomic_t *ref = &per_cpu(cpu_adaptive_nohz_ref, cpu);
+
+	if (atomic_add_return(0, ref) > 0)
+		return true;
+
+	return false;
+}
+
+static inline bool cpuset_adaptive_nohz(void)
+{
+	/*
+	 * We probably want to do atomic_read() when we read
+	 * locally to avoid the overhead of an ordered add.
+	 * For that we have to do the dec of the ref locally as
+	 * well.
+	 */
+	return cpuset_cpu_adaptive_nohz(smp_processor_id());
+}
+#else
+static inline bool cpuset_cpu_adaptive_nohz(int cpu) { return false; }
+static inline bool cpuset_adaptive_nohz(void) { return false; }
+
+#endif /* CONFIG_CPUSETS_NO_HZ */
 
 #endif /* _LINUX_CPUSET_H */
