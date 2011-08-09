@@ -1914,6 +1914,25 @@ static const struct sched_class rt_sched_class;
 static void inc_nr_running(struct rq *rq)
 {
 	rq->nr_running++;
+
+	if (rq->nr_running > 1) {
+		/*
+		 * Make rq->nr_running update visible right away so that
+		 * remote CPU knows that it must restart the tick.
+		 */
+		smp_wmb();
+		/*
+		 * Make updates to cpu_adaptive_nohz_ref visible right now.
+		 * If the CPU is not yet in a nohz cpuset then it will see
+		 * the value on rq->nr_running later on the first time it
+		 * tries to shutdown the tick. Otherwise we must send it
+		 * it an IPI. But the ordering must be strict to ensure
+		 * the first case.
+		 */
+		smp_rmb();
+		if (cpuset_cpu_adaptive_nohz(rq->cpu))
+			smp_cpuset_update_nohz(rq->cpu);
+	}
 }
 
 static void dec_nr_running(struct rq *rq)
@@ -2596,6 +2615,25 @@ static void update_avg(u64 *avg, u64 sample)
 {
 	s64 diff = sample - *avg;
 	*avg += diff >> 3;
+}
+#endif
+
+#ifdef CONFIG_CPUSETS_NO_HZ
+DEFINE_PER_CPU(int, task_nohz_mode);
+
+bool sched_can_stop_tick(void)
+{
+	struct rq *rq;
+
+	rq = this_rq();
+
+	/* Ensure nr_running updates are visible */
+	smp_rmb();
+	/* More than one running task need preemption */
+	if (rq->nr_running > 1)
+		return false;
+
+	return true;
 }
 #endif
 
@@ -3330,6 +3368,7 @@ context_switch(struct rq *rq, struct task_struct *prev,
 	 * frame will be invalid.
 	 */
 	finish_task_switch(this_rq(), prev);
+	tick_nohz_post_schedule();
 }
 
 /*

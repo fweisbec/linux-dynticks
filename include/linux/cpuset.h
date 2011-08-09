@@ -263,7 +263,6 @@ static inline bool cpuset_adaptive_nohz(void)
 
 	return false;
 }
-
 #endif /* CONFIG_CPUSETS_NO_HZ */
 
 #endif /* _LINUX_CPUSET_H */
