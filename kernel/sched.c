@@ -2433,6 +2433,38 @@ static void update_avg(u64 *avg, u64 sample)
 }
 #endif
 
+#ifdef CONFIG_CPUSETS_NO_HZ
+DEFINE_PER_CPU(int, task_nohz_mode);
+
+bool cpuset_nohz_can_stop_tick(void)
+{
+	struct rq *rq;
+
+	rq = this_rq();
+
+	/* More than one running task need preemption */
+	if (rq->nr_running > 1)
+		return false;
+
+	return true;
+}
+
+static void cpuset_nohz_restart_tick(void)
+{
+	__get_cpu_var(task_nohz_mode) = 0;
+	tick_nohz_restart_sched_tick();
+}
+
+void cpuset_update_nohz(void)
+{
+	if (!tick_nohz_adaptive_mode())
+		return;
+
+	if (!cpuset_nohz_can_stop_tick())
+		cpuset_nohz_restart_tick();
+}
+#endif
+
 static void
 ttwu_stat(struct task_struct *p, int cpu, int wake_flags)
 {
@@ -2560,6 +2592,8 @@ static void sched_ttwu_pending(void)
 		ttwu_do_activate(rq, p, 0);
 	}
 
+	cpuset_update_nohz();
+
 	raw_spin_unlock(&rq->lock);
 }
 
@@ -2620,6 +2654,7 @@ static void ttwu_queue(struct task_struct *p, int cpu)
 
 	raw_spin_lock(&rq->lock);
 	ttwu_do_activate(rq, p, 0);
+	cpuset_update_nohz();
 	raw_spin_unlock(&rq->lock);
 }
 

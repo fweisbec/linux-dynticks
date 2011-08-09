@@ -499,12 +499,7 @@ static void tick_nohz_restart(struct tick_sched *ts, ktime_t now)
 	}
 }
 
-/**
- * tick_nohz_restart_sched_tick - restart the idle tick from the idle task
- *
- * Restart the idle tick when the CPU is woken up from idle
- */
-static void tick_nohz_restart_sched_tick(ktime_t now, struct tick_sched *ts)
+static void __tick_nohz_restart_sched_tick(ktime_t now, struct tick_sched *ts)
 {
 	int cpu = smp_processor_id();
 
@@ -521,6 +516,31 @@ static void tick_nohz_restart_sched_tick(ktime_t now, struct tick_sched *ts)
 
 	tick_nohz_restart(ts, now);
 }
+
+/**
+ * tick_nohz_restart_sched_tick - restart the idle tick from the idle task
+ *
+ * Restart the idle tick when the CPU is woken up from idle
+ */
+void tick_nohz_restart_sched_tick(void)
+{
+	struct tick_sched *ts = &__get_cpu_var(tick_cpu_sched);
+	unsigned long flags;
+	ktime_t now;
+
+	local_irq_save(flags);
+
+	if (!ts->tick_stopped) {
+		local_irq_restore(flags);
+		return;
+	}
+
+	now = ktime_get();
+	__tick_nohz_restart_sched_tick(now, ts);
+
+	local_irq_restore(flags);
+}
+
 
 static void tick_nohz_account_idle_ticks(struct tick_sched *ts)
 {
@@ -560,7 +580,7 @@ void tick_nohz_exit_idle(void)
 	if (ts->tick_stopped) {
 		rcu_exit_nohz();
 		select_nohz_load_balancer(0);
-		tick_nohz_restart_sched_tick(now, ts);
+		__tick_nohz_restart_sched_tick(now, ts);
 		tick_nohz_account_idle_ticks(ts);
 	}
 
@@ -570,9 +590,14 @@ void tick_nohz_exit_idle(void)
 void tick_nohz_irq_exit(void)
 {
 	struct tick_sched *ts = &__get_cpu_var(tick_cpu_sched);
+	int cpu = smp_processor_id();
 
-	if (ts->inidle)
-		__tick_nohz_enter_idle(ts, smp_processor_id());
+	if (ts->inidle && !need_resched())
+		__tick_nohz_enter_idle(ts, cpu);
+	else if (tick_nohz_adaptive_mode() && !idle_cpu(cpu)) {
+		if (tick_nohz_can_stop_tick(cpu, ts))
+			tick_nohz_stop_sched_tick(ktime_get(), cpu, ts);
+	}
 }
 
 static int tick_nohz_reprogram(struct tick_sched *ts, ktime_t now)
@@ -732,6 +757,20 @@ void tick_check_idle(int cpu)
 
 #ifdef CONFIG_CPUSETS_NO_HZ
 
+int tick_nohz_adaptive_mode(void)
+{
+	return __get_cpu_var(task_nohz_mode);
+}
+
+static void tick_nohz_cpuset_stop_tick(int user)
+{
+	if (!cpuset_adaptive_nohz() || tick_nohz_adaptive_mode())
+		return;
+
+	if (cpuset_nohz_can_stop_tick())
+		__get_cpu_var(task_nohz_mode) = 1;
+}
+
 /*
  * Take the timer duty if nobody is taking care of it.
  * If a CPU already does and and it's in a nohz cpuset,
@@ -751,6 +790,8 @@ static void tick_do_timer_check_handler(int cpu)
 }
 
 #else
+
+static void tick_nohz_cpuset_stop_tick(int user) { }
 
 static void tick_do_timer_check_handler(int cpu)
 {
@@ -796,6 +837,7 @@ static enum hrtimer_restart tick_sched_timer(struct hrtimer *timer)
 	 * no valid regs pointer
 	 */
 	if (regs) {
+		int user = user_mode(regs);
 		/*
 		 * When we are idle and the tick is stopped, we have to touch
 		 * the watchdog as we might not schedule for a really long
@@ -809,8 +851,9 @@ static enum hrtimer_restart tick_sched_timer(struct hrtimer *timer)
 			if (idle_cpu(cpu))
 				ts->idle_jiffies++;
 		}
-		update_process_times(user_mode(regs));
+		update_process_times(user);
 		profile_tick(CPU_PROFILING);
+		tick_nohz_cpuset_stop_tick(user);
 	}
 
 	hrtimer_forward(timer, now, tick_period);
