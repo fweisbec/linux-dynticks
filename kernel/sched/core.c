@@ -1353,6 +1353,29 @@ static void update_avg(u64 *avg, u64 sample)
 }
 #endif
 
+#ifdef CONFIG_CPUSETS_NO_HZ
+bool sched_can_stop_tick(void)
+{
+	struct rq *rq;
+
+	rq = this_rq();
+
+	/*
+	 * This is called right after cpuset_adaptive_nohz() that
+	 * uses atomic_add_return() so that we are ordered against
+	 * cpu_adaptive_nohz_ref. When inc_nr_running() sends an
+	 * IPI to this CPU, we are guaranteed to see the update on
+	 * nr_running.
+	 */
+
+	/* More than one running task need preemption */
+	if (rq->nr_running > 1)
+		return false;
+
+	return true;
+}
+#endif
+
 static void
 ttwu_stat(struct task_struct *p, int cpu, int wake_flags)
 {
@@ -2091,6 +2114,7 @@ context_switch(struct rq *rq, struct task_struct *prev,
 	 * frame will be invalid.
 	 */
 	finish_task_switch(this_rq(), prev);
+	tick_nohz_post_schedule();
 }
 
 /*

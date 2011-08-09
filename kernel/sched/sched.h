@@ -1,6 +1,7 @@
 
 #include <linux/sched.h>
 #include <linux/mutex.h>
+#include <linux/cpuset.h>
 #include <linux/spinlock.h>
 #include <linux/stop_machine.h>
 
@@ -919,6 +920,17 @@ static inline void cpuacct_charge(struct task_struct *tsk, u64 cputime) {}
 static inline void inc_nr_running(struct rq *rq)
 {
 	rq->nr_running++;
+
+	if (rq->nr_running == 2) {
+		/*
+		 * cpuset_cpu_adaptive_nohz() uses atomic_add_return()
+		 * to order against rq->nr_running updates. This way
+		 * the CPU that receives the IPI is guaranteed to see
+		 * the update on nr_running without the rq->lock.
+		 */
+		if (cpuset_cpu_adaptive_nohz(rq->cpu))
+			smp_cpuset_update_nohz(rq->cpu);
+	}
 }
 
 static inline void dec_nr_running(struct rq *rq)
