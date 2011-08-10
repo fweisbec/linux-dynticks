@@ -2477,6 +2477,18 @@ void cpuset_update_nohz(void)
 	if (!cpuset_nohz_can_stop_tick())
 		cpuset_nohz_restart_tick();
 }
+
+static void cpuset_nohz_task_switch(struct task_struct *next)
+{
+	int cpu = smp_processor_id();
+
+	if (tick_nohz_adaptive_mode() && next == idle_task(cpu))
+		cpuset_nohz_restart_tick();
+}
+#else
+static void cpuset_nohz_task_switch(struct task_struct *next)
+{
+}
 #endif
 
 static void
@@ -3023,6 +3035,7 @@ static inline void
 prepare_task_switch(struct rq *rq, struct task_struct *prev,
 		    struct task_struct *next)
 {
+	cpuset_nohz_task_switch(next);
 	sched_info_switch(prev, next);
 	perf_event_task_sched_out(prev, next);
 	fire_sched_out_preempt_notifiers(prev, next);
