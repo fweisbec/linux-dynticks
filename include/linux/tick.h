@@ -135,9 +135,11 @@ DECLARE_PER_CPU(int, task_nohz_mode);
 
 extern int tick_nohz_adaptive_mode(void);
 extern void tick_nohz_check_adaptive(void);
+extern void tick_nohz_post_schedule(void);
 #else /* !CPUSETS_NO_HZ */
 static inline int tick_nohz_adaptive_mode(void) { return 0; }
 static inline void tick_nohz_check_adaptive(void) { }
+static inline void tick_nohz_post_schedule(void) { }
 #endif /* CPUSETS_NO_HZ */
 
 # else /* !NO_HZ */

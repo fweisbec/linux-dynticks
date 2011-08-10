@@ -880,6 +880,19 @@ void tick_nohz_check_adaptive(void)
 		tick_nohz_restart_adaptive();
 }
 
+void tick_nohz_post_schedule(void)
+{
+	int cpu = smp_processor_id();
+
+	/*
+	 * No need to disable irqs here. The worst that can happen
+	 * is an irq that comes and restart the tick before us.
+	 * tick_nohz_restart_sched_tick() is irq safe.
+	 */
+	if (tick_nohz_adaptive_mode() && current == idle_task(cpu))
+		cpuset_nohz_restart_tick();
+}
+
 #else
 
 static void tick_do_timer_check_handler(int cpu)
