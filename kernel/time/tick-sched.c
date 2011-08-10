@@ -529,8 +529,11 @@ static void tick_nohz_cpuset_stop_tick(struct tick_sched *ts)
 	if (!ts->tick_stopped)
 		return;
 
-	if (!tick_nohz_adaptive_mode())
+	if (!tick_nohz_adaptive_mode()) {
 		__get_cpu_var(task_nohz_mode) = 1;
+		/* Nohz mode must be visible to wake_up_nohz_cpu() */
+		smp_wmb();
+	}
 }
 #else
 static void tick_nohz_cpuset_stop_tick(void) { }
