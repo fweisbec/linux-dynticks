@@ -525,6 +525,8 @@ static bool tick_nohz_cpuset_stop_tick(void)
 
 	if (can_stop_adaptive_tick()) {
 		__get_cpu_var(task_nohz_mode) = 1;
+		/* Nohz mode must be visible to wake_up_nohz_cpu() */
+		smp_wmb();
 		return true;
 	}
 
