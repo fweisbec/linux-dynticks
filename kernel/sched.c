@@ -2439,11 +2439,25 @@ DEFINE_PER_CPU(int, task_nohz_mode);
 bool cpuset_nohz_can_stop_tick(void)
 {
 	struct rq *rq;
+	int cpu;
 
 	rq = this_rq();
 
 	/* More than one running task need preemption */
 	if (rq->nr_running > 1)
+		return false;
+
+	cpu = smp_processor_id();
+
+	/*
+	 * FIXME: will probably be removed soon as it's
+	 * already checked from tick_nohz_stop_sched_tick()
+	 */
+	if (rcu_needs_cpu(cpu))
+		return false;
+
+	/* Is there a grace period to complete ? */
+	if (rcu_pending(cpu))
 		return false;
 
 	return true;

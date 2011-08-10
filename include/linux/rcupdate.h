@@ -133,6 +133,7 @@ static inline int rcu_preempt_depth(void)
 extern void rcu_sched_qs(int cpu);
 extern void rcu_bh_qs(int cpu);
 extern void rcu_check_callbacks(int cpu, int user);
+extern int rcu_pending(int cpu);
 struct notifier_block;
 
 #ifdef CONFIG_NO_HZ
