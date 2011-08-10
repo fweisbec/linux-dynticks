@@ -71,6 +71,7 @@
 #include <linux/ctype.h>
 #include <linux/ftrace.h>
 #include <linux/slab.h>
+#include <linux/posix-timers.h>
 
 #include <asm/tlb.h>
 #include <asm/irq_regs.h>
@@ -2489,6 +2490,9 @@ bool cpuset_nohz_can_stop_tick(void)
 
 	/* Is there a grace period to complete ? */
 	if (rcu_pending(cpu))
+		return false;
+
+	if (posix_cpu_timers_running(current))
 		return false;
 
 	return true;
