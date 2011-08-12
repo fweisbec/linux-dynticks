@@ -42,6 +42,7 @@
 #include <linux/notifier.h>
 #include <linux/rculist.h>
 #include <linux/poll.h>
+#include <linux/cpuset.h>
 
 #include <asm/uaccess.h>
 
@@ -1758,8 +1759,20 @@ int printk_needs_cpu(int cpu)
 
 void wake_up_klogd(void)
 {
-	if (waitqueue_active(&log_wait))
+	unsigned long flags;
+
+	if (waitqueue_active(&log_wait)) {
 		this_cpu_or(printk_pending, PRINTK_PENDING_WAKEUP);
+		/* Make it visible from any interrupt from now */
+		barrier();
+		/*
+		 * It's safe to check that even if interrupts are not disabled.
+		 * If we enable nohz adaptive mode concurrently, we'll see the
+		 * printk_pending value and thus keep a periodic tick behaviour.
+		 */
+		if (cpuset_adaptive_nohz())
+			smp_cpuset_update_nohz(smp_processor_id());
+	}
 }
 
 /* the next printk record to write to the console */
