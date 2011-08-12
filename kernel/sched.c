@@ -2513,6 +2513,14 @@ void cpuset_update_nohz(void)
 		cpuset_nohz_restart_tick();
 }
 
+void cpuset_exit_nohz_interrupt(void *unused)
+{
+	if (!tick_nohz_adaptive_mode())
+		return;
+
+	cpuset_nohz_restart_tick();
+}
+
 static void cpuset_nohz_task_switch(struct task_struct *next)
 {
 	int cpu = smp_processor_id();

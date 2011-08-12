@@ -265,6 +265,7 @@ static inline bool cpuset_adaptive_nohz(void)
 }
 
 extern void cpuset_update_nohz(void);
+extern void cpuset_exit_nohz_interrupt(void *unused);
 #else
 static inline void cpuset_update_nohz(void) { }
 
