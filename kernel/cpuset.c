@@ -1194,6 +1194,14 @@ static void cpuset_change_flag(struct task_struct *tsk,
 
 DEFINE_PER_CPU(atomic_t, cpu_adaptive_nohz_ref);
 
+static void cpu_exit_nohz(int cpu)
+{
+	preempt_disable();
+	smp_call_function_single(cpu, cpuset_exit_nohz_interrupt,
+				 NULL, true);
+	preempt_enable();
+}
+
 static void update_nohz_cpus(struct cpuset *old_cs, struct cpuset *cs)
 {
 	int cpu;
@@ -1205,9 +1213,22 @@ static void update_nohz_cpus(struct cpuset *old_cs, struct cpuset *cs)
 	for_each_cpu(cpu, cs->cpus_allowed) {
 		atomic_t *ref = &per_cpu(cpu_adaptive_nohz_ref, cpu);
 		if (is_adaptive_nohz(cs))
-			atomic_inc(ref);
+			val = atomic_inc_return(ref);
 		else
-			atomic_dec(ref);
+			val = atomic_dec_return(ref);
+
+		if (!val) {
+			/*
+			 * The update to cpu_adaptive_nohz_ref must be
+			 * visible right away. So that once we restart the tick
+			 * from the IPI, it won't be stopped again due to cache
+			 * update lag.
+			 * FIXME: We probably need more to ensure this value is really
+			 * visible right away.
+			 */
+			smp_mb();
+			cpu_exit_nohz(cpu);
+		}
 	}
 }
 #else

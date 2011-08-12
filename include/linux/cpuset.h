@@ -260,6 +260,8 @@ static inline bool cpuset_adaptive_nohz(void)
 	 */
 	return cpuset_cpu_adaptive_nohz(smp_processor_id());
 }
+
+extern void cpuset_exit_nohz_interrupt(void *unused);
 #else
 static inline bool cpuset_cpu_adaptive_nohz(int cpu) { return false; }
 static inline bool cpuset_adaptive_nohz(void) { return false; }
