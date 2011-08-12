@@ -52,6 +52,7 @@
 #include <linux/prefetch.h>
 #include <linux/delay.h>
 #include <linux/stop_machine.h>
+#include <linux/cpuset.h>
 
 #include "rcutree.h"
 #include <trace/events/rcu.h>
@@ -313,6 +314,20 @@ static struct rcu_node *rcu_get_root(struct rcu_state *rsp)
 	return &rsp->node[0];
 }
 
+static void cpuset_update_rcu_cpu(int cpu)
+{
+#ifdef CONFIG_CPUSETS_NO_HZ
+	unsigned long flags;
+
+	local_irq_save(flags);
+
+	if (cpuset_cpu_adaptive_nohz(cpu))
+		smp_cpuset_update_nohz(cpu);
+
+	local_irq_restore(flags);
+#endif
+}
+
 /*
  * If the specified CPU is offline, tell the caller that it is in
  * a quiescent state.  Otherwise, whack it with a reschedule IPI.
@@ -339,6 +354,9 @@ static int rcu_implicit_offline_qs(struct rcu_data *rdp)
 		rdp->offline_fqs++;
 		return 1;
 	}
+
+	cpuset_update_rcu_cpu(rdp->cpu);
+
 	return 0;
 }
 
