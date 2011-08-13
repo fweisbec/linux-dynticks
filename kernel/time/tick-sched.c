@@ -786,6 +786,85 @@ static inline void tick_check_nohz(int cpu)
 	}
 }
 
+#ifdef CONFIG_NO_HZ_FULL
+void tick_nohz_exit_kernel(void)
+{
+	unsigned long flags;
+	struct tick_sched *ts;
+	unsigned long delta_jiffies;
+
+	if (!test_thread_flag(TIF_NOHZ))
+		return;
+
+	local_irq_save(flags);
+
+	ts = &__get_cpu_var(tick_cpu_sched);
+
+	WARN_ON_ONCE(!ts->tick_stopped);
+	WARN_ON_ONCE(ts->saved_jiffies_whence != JIFFIES_SAVED_SYS);
+
+	delta_jiffies = jiffies - ts->saved_jiffies;
+	account_system_ticks(current, delta_jiffies);
+
+	ts->saved_jiffies = jiffies;
+	ts->saved_jiffies_whence = JIFFIES_SAVED_USER;
+
+	local_irq_restore(flags);
+}
+
+void tick_nohz_enter_kernel(void)
+{
+	unsigned long flags;
+	struct tick_sched *ts;
+	unsigned long delta_jiffies;
+
+	if (!test_thread_flag(TIF_NOHZ))
+		return;
+
+	local_irq_save(flags);
+
+	ts = &__get_cpu_var(tick_cpu_sched);
+
+	WARN_ON_ONCE(!ts->tick_stopped);
+	WARN_ON_ONCE(ts->saved_jiffies_whence != JIFFIES_SAVED_USER);
+
+	delta_jiffies = jiffies - ts->saved_jiffies;
+	account_user_ticks(current, delta_jiffies);
+
+	ts->saved_jiffies = jiffies;
+	ts->saved_jiffies_whence = JIFFIES_SAVED_SYS;
+
+	local_irq_restore(flags);
+}
+
+void tick_nohz_enter_exception(struct pt_regs *regs)
+{
+	if (user_mode(regs))
+		tick_nohz_enter_kernel();
+}
+
+void tick_nohz_exit_exception(struct pt_regs *regs)
+{
+	if (user_mode(regs))
+		tick_nohz_exit_kernel();
+}
+
+/*
+ * Flush cputime and clear hooks before context switch so that
+ * we account the time spent tickless.
+ */
+void tick_nohz_pre_schedule(void)
+{
+	struct tick_sched *ts;
+
+	if (test_thread_flag(TIF_NOHZ)) {
+		ts = &__get_cpu_var(tick_cpu_sched);
+		tick_nohz_account_ticks(ts);
+		clear_thread_flag(TIF_NOHZ);
+	}
+}
+#endif /* CONFIG_NO_HZ_FULL */
+
 #else
 
 static inline void tick_nohz_switch_to_nohz(void) { }
