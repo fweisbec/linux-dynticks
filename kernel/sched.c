@@ -2500,6 +2500,7 @@ bool cpuset_nohz_can_stop_tick(void)
 
 static void cpuset_nohz_restart_tick(void)
 {
+	tick_nohz_flush_current_times();
 	__get_cpu_var(task_nohz_mode) = 0;
 	tick_nohz_restart_sched_tick();
 }
@@ -3838,6 +3839,17 @@ void account_user_time(struct task_struct *p, cputime_t cputime,
 	acct_update_integrals(p);
 }
 
+void account_user_jiffies(struct task_struct *p, unsigned long count)
+{
+	cputime_t delta_cputime, delta_scaled;
+
+	if (count) {
+		delta_cputime = jiffies_to_cputime(count);
+		delta_scaled = cputime_to_scaled(count);
+		account_user_time(p, delta_cputime, delta_scaled);
+	}
+}
+
 /*
  * Account guest cpu time to a process.
  * @p: the process that the cpu time gets accounted to
@@ -3920,6 +3932,17 @@ void account_system_time(struct task_struct *p, int hardirq_offset,
 		target_cputime64 = &cpustat->system;
 
 	__account_system_time(p, cputime, cputime_scaled, target_cputime64);
+}
+
+void account_system_jiffies(struct task_struct *p, unsigned long count)
+{
+	cputime_t delta_cputime, delta_scaled;
+
+	if (count) {
+		delta_cputime = jiffies_to_cputime(count);
+		delta_scaled = cputime_to_scaled(count);
+		account_system_time(p, 0, delta_cputime, delta_scaled);
+	}
 }
 
 /*

@@ -764,6 +764,8 @@ int tick_nohz_adaptive_mode(void)
 
 static void tick_nohz_cpuset_stop_tick(int user)
 {
+	struct tick_sched *ts = &__get_cpu_var(tick_cpu_sched);
+
 	if (!cpuset_adaptive_nohz() || tick_nohz_adaptive_mode())
 		return;
 
@@ -771,6 +773,13 @@ static void tick_nohz_cpuset_stop_tick(int user)
 		__get_cpu_var(task_nohz_mode) = 1;
 		/* Nohz mode must be visible to wake_up_nohz_cpu() */
 		smp_wmb();
+
+		WARN_ON_ONCE(ts->saved_jiffies_whence != JIFFIES_SAVED_NONE);
+		ts->saved_jiffies = jiffies;
+		if (user)
+			ts->saved_jiffies_whence = JIFFIES_SAVED_USER;
+		else
+			ts->saved_jiffies_whence = JIFFIES_SAVED_SYS;
 	}
 }
 
@@ -790,6 +799,36 @@ static void tick_do_timer_check_handler(int cpu)
 		    cpuset_cpu_adaptive_nohz(handler))
 			tick_do_timer_cpu = cpu;
 	}
+}
+
+bool tick_nohz_account_tick(void)
+{
+	struct tick_sched *ts;
+	unsigned long delta_jiffies;
+
+	if (!tick_nohz_adaptive_mode())
+		return false;
+
+	ts = &__get_cpu_var(tick_cpu_sched);
+
+	delta_jiffies = jiffies - ts->saved_jiffies;
+	if (ts->saved_jiffies_whence == JIFFIES_SAVED_SYS)
+		account_system_jiffies(current, delta_jiffies);
+	else
+		account_user_jiffies(current, delta_jiffies);
+
+	ts->saved_jiffies = jiffies;
+
+	return true;
+}
+
+void tick_nohz_flush_current_times(void)
+{
+	struct tick_sched *ts = &__get_cpu_var(tick_cpu_sched);
+
+	tick_nohz_account_tick();
+
+	ts->saved_jiffies_whence = JIFFIES_SAVED_NONE;
 }
 
 #else
