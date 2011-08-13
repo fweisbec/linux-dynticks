@@ -27,6 +27,12 @@ enum tick_nohz_mode {
 	NOHZ_MODE_HIGHRES,
 };
 
+enum tick_saved_jiffies {
+	JIFFIES_SAVED_NONE,
+	JIFFIES_SAVED_USER,
+	JIFFIES_SAVED_SYS,
+};
+
 /**
  * struct tick_sched - sched tick emulation and no idle tick control/stats
  * @sched_timer:	hrtimer to schedule the periodic tick in high
@@ -62,6 +68,8 @@ struct tick_sched {
 	ktime_t				idle_waketime;
 	ktime_t				idle_exittime;
 	ktime_t				idle_sleeptime;
+	enum tick_saved_jiffies		saved_jiffies_whence;
+	unsigned long			saved_jiffies;
 	ktime_t				iowait_sleeptime;
 	ktime_t				sleep_length;
 	unsigned long			last_jiffies;
@@ -133,13 +141,26 @@ extern u64 get_cpu_iowait_time_us(int cpu, u64 *last_update_time);
 #ifdef CONFIG_CPUSETS_NO_HZ
 DECLARE_PER_CPU(int, task_nohz_mode);
 
+extern void tick_nohz_enter_kernel(void);
+extern void tick_nohz_exit_kernel(void);
+extern void tick_nohz_enter_exception(struct pt_regs *regs);
+extern void tick_nohz_exit_exception(struct pt_regs *regs);
 extern int tick_nohz_adaptive_mode(void);
 extern void tick_nohz_check_adaptive(void);
+extern void tick_nohz_pre_schedule(void);
 extern void tick_nohz_post_schedule(void);
+extern bool tick_nohz_account_tick(void);
+extern void tick_nohz_flush_current_times(void);
 #else /* !CPUSETS_NO_HZ */
+static inline void tick_nohz_enter_kernel(void) { }
+static inline void tick_nohz_exit_kernel(void) { }
+static inline void tick_nohz_enter_exception(struct pt_regs *regs) { }
+static inline void tick_nohz_exit_exception(struct pt_regs *regs) { }
 static inline int tick_nohz_adaptive_mode(void) { return 0; }
 static inline void tick_nohz_check_adaptive(void) { }
+static inline void tick_nohz_pre_schedule(void) { }
 static inline void tick_nohz_post_schedule(void) { }
+static inline bool tick_nohz_account_tick(void) { return false; }
 #endif /* CPUSETS_NO_HZ */
 
 # else /* !NO_HZ */

@@ -3218,6 +3218,7 @@ static inline void
 prepare_task_switch(struct rq *rq, struct task_struct *prev,
 		    struct task_struct *next)
 {
+	tick_nohz_pre_schedule();
 	sched_info_switch(prev, next);
 	perf_event_task_sched_out(prev, next);
 	fire_sched_out_preempt_notifiers(prev, next);
@@ -3954,6 +3955,17 @@ void account_user_time(struct task_struct *p, cputime_t cputime,
 	acct_update_integrals(p);
 }
 
+void account_user_jiffies(struct task_struct *p, unsigned long count)
+{
+	cputime_t delta_cputime, delta_scaled;
+
+	if (count) {
+		delta_cputime = jiffies_to_cputime(count);
+		delta_scaled = cputime_to_scaled(count);
+		account_user_time(p, delta_cputime, delta_scaled);
+	}
+}
+
 /*
  * Account guest cpu time to a process.
  * @p: the process that the cpu time gets accounted to
@@ -4036,6 +4048,17 @@ void account_system_time(struct task_struct *p, int hardirq_offset,
 		target_cputime64 = &cpustat->system;
 
 	__account_system_time(p, cputime, cputime_scaled, target_cputime64);
+}
+
+void account_system_jiffies(struct task_struct *p, unsigned long count)
+{
+	cputime_t delta_cputime, delta_scaled;
+
+	if (count) {
+		delta_cputime = jiffies_to_cputime(count);
+		delta_scaled = cputime_to_scaled(count);
+		account_system_time(p, 0, delta_cputime, delta_scaled);
+	}
 }
 
 /*
