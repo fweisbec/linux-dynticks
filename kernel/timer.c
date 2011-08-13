@@ -1288,8 +1288,10 @@ void update_process_times(int user_tick)
 	struct task_struct *p = current;
 	int cpu = smp_processor_id();
 
-	/* Note: this timer irq context must be accounted for as well. */
-	account_process_tick(p, user_tick);
+	if (!tick_nohz_account_tick()) {
+		/* Note: this timer irq context must be accounted for as well. */
+		account_process_tick(p, user_tick);
+	}
 	run_local_timers();
 	rcu_check_callbacks(cpu, user_tick);
 	printk_tick();
