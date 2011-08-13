@@ -51,6 +51,7 @@
 #include <linux/kthread.h>
 #include <linux/prefetch.h>
 #include <linux/cpuset.h>
+#include <linux/tick.h>
 
 #include "rcutree.h"
 #include <trace/events/rcu.h>
@@ -1740,6 +1741,13 @@ __call_rcu(struct rcu_head *head, void (*func)(struct rcu_head *rcu),
 					 rdp->qlen);
 	else
 		trace_rcu_callback(rsp->name, head, rdp->qlen);
+
+	/* Restart the timer if needed to handle the callbacks */
+	if (tick_nohz_adaptive_mode()) {
+		/* Make updates on nxtlist visible to self IPI */
+		barrier();
+		smp_cpuset_update_nohz(smp_processor_id());
+	}
 
 	/* If interrupts were disabled, don't dive into RCU core. */
 	if (irqs_disabled_flags(flags)) {
