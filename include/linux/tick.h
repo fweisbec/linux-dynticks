@@ -139,10 +139,18 @@ extern u64 get_cpu_iowait_time_us(int cpu, u64 *last_update_time);
 #ifdef CONFIG_CPUSETS_NO_HZ
 DECLARE_PER_CPU(int, task_nohz_mode);
 
+extern void tick_nohz_enter_kernel(void);
+extern void tick_nohz_exit_kernel(void);
+extern void tick_nohz_enter_exception(struct pt_regs *regs);
+extern void tick_nohz_exit_exception(struct pt_regs *regs);
 extern int tick_nohz_adaptive_mode(void);
 extern bool tick_nohz_account_tick(void);
 extern void tick_nohz_flush_current_times(void);
 #else /* !CPUSETS_NO_HZ */
+static inline void tick_nohz_enter_kernel(void) { }
+static inline void tick_nohz_exit_kernel(void) { }
+static inline void tick_nohz_enter_exception(struct pt_regs *regs) { }
+static inline void tick_nohz_exit_exception(struct pt_regs *regs) { }
 static inline int tick_nohz_adaptive_mode(void) { return 0; }
 static inline bool tick_nohz_account_tick(void) { return false; }
 #endif /* CPUSETS_NO_HZ */

@@ -595,8 +595,9 @@ void tick_nohz_irq_exit(void)
 	if (ts->inidle && !need_resched())
 		__tick_nohz_enter_idle(ts, cpu);
 	else if (tick_nohz_adaptive_mode() && !idle_cpu(cpu)) {
-		if (tick_nohz_can_stop_tick(cpu, ts))
-			tick_nohz_stop_sched_tick(ktime_get(), cpu, ts);
+		if (ts->saved_jiffies_whence != JIFFIES_SAVED_NONE
+		    && tick_nohz_can_stop_tick(cpu, ts))
+				tick_nohz_stop_sched_tick(ktime_get(), cpu, ts);
 	}
 }
 
@@ -757,6 +758,74 @@ void tick_check_idle(int cpu)
 
 #ifdef CONFIG_CPUSETS_NO_HZ
 
+void tick_nohz_exit_kernel(void)
+{
+	unsigned long flags;
+	struct tick_sched *ts;
+	unsigned long delta_jiffies;
+
+	local_irq_save(flags);
+
+	if (!tick_nohz_adaptive_mode()) {
+		local_irq_restore(flags);
+		return;
+	}
+
+	ts = &__get_cpu_var(tick_cpu_sched);
+
+	WARN_ON_ONCE(ts->saved_jiffies_whence == JIFFIES_SAVED_USER);
+
+	if (ts->saved_jiffies_whence == JIFFIES_SAVED_SYS) {
+		delta_jiffies = jiffies - ts->saved_jiffies;
+		account_system_jiffies(current, delta_jiffies);
+	}
+
+	ts->saved_jiffies = jiffies;
+	ts->saved_jiffies_whence = JIFFIES_SAVED_USER;
+
+	local_irq_restore(flags);
+}
+
+void tick_nohz_enter_kernel(void)
+{
+	unsigned long flags;
+	struct tick_sched *ts;
+	unsigned long delta_jiffies;
+
+	local_irq_save(flags);
+
+	if (!tick_nohz_adaptive_mode()) {
+		local_irq_restore(flags);
+		return;
+	}
+
+	ts = &__get_cpu_var(tick_cpu_sched);
+
+	WARN_ON_ONCE(ts->saved_jiffies_whence == JIFFIES_SAVED_SYS);
+
+	if (ts->saved_jiffies_whence == JIFFIES_SAVED_USER) {
+		delta_jiffies = jiffies - ts->saved_jiffies;
+		account_user_jiffies(current, delta_jiffies);
+	}
+
+	ts->saved_jiffies = jiffies;
+	ts->saved_jiffies_whence = JIFFIES_SAVED_SYS;
+
+	local_irq_restore(flags);
+}
+
+void tick_nohz_enter_exception(struct pt_regs *regs)
+{
+	if (user_mode(regs))
+		tick_nohz_enter_kernel();
+}
+
+void tick_nohz_exit_exception(struct pt_regs *regs)
+{
+	if (user_mode(regs))
+		tick_nohz_exit_kernel();
+}
+
 int tick_nohz_adaptive_mode(void)
 {
 	return __get_cpu_var(task_nohz_mode);
@@ -766,20 +835,33 @@ static void tick_nohz_cpuset_stop_tick(int user)
 {
 	struct tick_sched *ts = &__get_cpu_var(tick_cpu_sched);
 
-	if (!cpuset_adaptive_nohz() || tick_nohz_adaptive_mode())
+	if (!cpuset_adaptive_nohz())
 		return;
+
+	if (tick_nohz_adaptive_mode()) {
+		if (user && ts->saved_jiffies_whence == JIFFIES_SAVED_NONE) {
+			ts->saved_jiffies_whence = JIFFIES_SAVED_USER;
+			ts->saved_jiffies = jiffies;
+		}
+
+		return;
+	}
 
 	if (cpuset_nohz_can_stop_tick()) {
 		__get_cpu_var(task_nohz_mode) = 1;
 		/* Nohz mode must be visible to wake_up_nohz_cpu() */
 		smp_wmb();
 
+		set_thread_flag(TIF_NOHZ);
 		WARN_ON_ONCE(ts->saved_jiffies_whence != JIFFIES_SAVED_NONE);
-		ts->saved_jiffies = jiffies;
-		if (user)
+
+		if (user) {
 			ts->saved_jiffies_whence = JIFFIES_SAVED_USER;
-		else
+			ts->saved_jiffies = jiffies;
+		} else if (!current->mm) {
 			ts->saved_jiffies_whence = JIFFIES_SAVED_SYS;
+			ts->saved_jiffies = jiffies;
+		}
 	}
 }
 
@@ -803,7 +885,7 @@ static void tick_do_timer_check_handler(int cpu)
 
 bool tick_nohz_account_tick(void)
 {
-	struct tick_sched *ts;
+	struct tick_sched *ts = &__get_cpu_var(tick_cpu_sched);
 	unsigned long delta_jiffies;
 
 	if (!tick_nohz_adaptive_mode())
@@ -811,11 +893,15 @@ bool tick_nohz_account_tick(void)
 
 	ts = &__get_cpu_var(tick_cpu_sched);
 
+	if (ts->saved_jiffies_whence == JIFFIES_SAVED_NONE)
+		return false;
+
 	delta_jiffies = jiffies - ts->saved_jiffies;
-	if (ts->saved_jiffies_whence == JIFFIES_SAVED_SYS)
-		account_system_jiffies(current, delta_jiffies);
-	else
+
+	if (ts->saved_jiffies_whence == JIFFIES_SAVED_USER)
 		account_user_jiffies(current, delta_jiffies);
+	else
+		account_system_jiffies(current, delta_jiffies);
 
 	ts->saved_jiffies = jiffies;
 
@@ -825,12 +911,12 @@ bool tick_nohz_account_tick(void)
 void tick_nohz_flush_current_times(void)
 {
 	struct tick_sched *ts = &__get_cpu_var(tick_cpu_sched);
+	unsigned long delta_jiffies;
+	struct pt_regs *regs;
 
-	tick_nohz_account_tick();
-
-	ts->saved_jiffies_whence = JIFFIES_SAVED_NONE;
+	if (tick_nohz_account_tick())
+		ts->saved_jiffies_whence = JIFFIES_SAVED_NONE;
 }
-
 #else
 
 static void tick_nohz_cpuset_stop_tick(int user) { }
