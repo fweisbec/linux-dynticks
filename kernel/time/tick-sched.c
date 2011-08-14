@@ -757,6 +757,7 @@ void tick_check_idle(int cpu)
 }
 
 #ifdef CONFIG_CPUSETS_NO_HZ
+DEFINE_PER_CPU(int, nohz_task_ext_qs);
 
 void tick_nohz_exit_kernel(void)
 {
@@ -783,6 +784,9 @@ void tick_nohz_exit_kernel(void)
 	ts->saved_jiffies = jiffies;
 	ts->saved_jiffies_whence = JIFFIES_SAVED_USER;
 
+	__get_cpu_var(nohz_task_ext_qs) = 1;
+	rcu_enter_nohz();
+
 	local_irq_restore(flags);
 }
 
@@ -799,6 +803,11 @@ void tick_nohz_enter_kernel(void)
 		return;
 	}
 
+	if (__get_cpu_var(nohz_task_ext_qs) == 1) {
+		__get_cpu_var(nohz_task_ext_qs) = 0;
+		rcu_exit_nohz();
+	}
+
 	ts = &__get_cpu_var(tick_cpu_sched);
 
 	WARN_ON_ONCE(ts->saved_jiffies_whence == JIFFIES_SAVED_SYS);
@@ -812,6 +821,16 @@ void tick_nohz_enter_kernel(void)
 	ts->saved_jiffies_whence = JIFFIES_SAVED_SYS;
 
 	local_irq_restore(flags);
+}
+
+void tick_nohz_cpu_exit_qs(void)
+{
+	struct tick_sched *ts = &__get_cpu_var(tick_cpu_sched);
+
+	if (__get_cpu_var(nohz_task_ext_qs)) {
+		rcu_exit_nohz();
+		__get_cpu_var(nohz_task_ext_qs) = 0;
+	}
 }
 
 void tick_nohz_enter_exception(struct pt_regs *regs)
@@ -858,6 +877,8 @@ static void tick_nohz_cpuset_stop_tick(int user)
 		if (user) {
 			ts->saved_jiffies_whence = JIFFIES_SAVED_USER;
 			ts->saved_jiffies = jiffies;
+			__get_cpu_var(nohz_task_ext_qs) = 1;
+			rcu_enter_nohz();
 		} else if (!current->mm) {
 			ts->saved_jiffies_whence = JIFFIES_SAVED_SYS;
 			ts->saved_jiffies = jiffies;

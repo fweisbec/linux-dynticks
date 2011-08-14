@@ -2504,6 +2504,7 @@ static void cpuset_nohz_restart_tick(void)
 	__get_cpu_var(task_nohz_mode) = 0;
 	tick_nohz_restart_sched_tick();
 	clear_thread_flag(TIF_NOHZ);
+	tick_nohz_cpu_exit_qs();
 }
 
 void cpuset_update_nohz(void)
