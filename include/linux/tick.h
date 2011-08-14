@@ -145,7 +145,7 @@ extern void tick_nohz_enter_exception(struct pt_regs *regs);
 extern void tick_nohz_exit_exception(struct pt_regs *regs);
 extern int tick_nohz_adaptive_mode(void);
 extern bool tick_nohz_account_tick(void);
-extern void tick_nohz_flush_current_times(void);
+extern void tick_nohz_flush_current_times(bool restart_tick);
 #else /* !CPUSETS_NO_HZ */
 static inline void tick_nohz_enter_kernel(void) { }
 static inline void tick_nohz_exit_kernel(void) { }

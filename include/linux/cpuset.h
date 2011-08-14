@@ -265,9 +265,11 @@ static inline bool cpuset_adaptive_nohz(void)
 }
 
 extern void cpuset_update_nohz(void);
+extern void cpuset_nohz_flush_cputimes(void);
 extern void cpuset_exit_nohz_interrupt(void *unused);
 #else
 static inline void cpuset_update_nohz(void) { }
+static inline void cpuset_nohz_flush_cputimes(void) { }
 
 #endif /* CONFIG_CPUSETS_NO_HZ */
 

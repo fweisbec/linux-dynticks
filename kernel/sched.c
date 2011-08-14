@@ -2500,7 +2500,7 @@ bool cpuset_nohz_can_stop_tick(void)
 
 static void cpuset_nohz_restart_tick(void)
 {
-	tick_nohz_flush_current_times();
+	tick_nohz_flush_current_times(true);
 	__get_cpu_var(task_nohz_mode) = 0;
 	tick_nohz_restart_sched_tick();
 	clear_thread_flag(TIF_NOHZ);

@@ -908,13 +908,13 @@ bool tick_nohz_account_tick(void)
 	return true;
 }
 
-void tick_nohz_flush_current_times(void)
+void tick_nohz_flush_current_times(bool restart_tick)
 {
 	struct tick_sched *ts = &__get_cpu_var(tick_cpu_sched);
 	unsigned long delta_jiffies;
 	struct pt_regs *regs;
 
-	if (tick_nohz_account_tick())
+	if (tick_nohz_account_tick() && restart_tick)
 		ts->saved_jiffies_whence = JIFFIES_SAVED_NONE;
 }
 #else
