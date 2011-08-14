@@ -960,7 +960,7 @@ static void tick_do_timer_check_handler(int cpu)
 
 static void tick_nohz_restart_adaptive(void)
 {
-	tick_nohz_flush_current_times();
+	tick_nohz_flush_current_times(true);
 	__get_cpu_var(task_nohz_mode) = 0;
 	tick_nohz_restart_sched_tick();
 	clear_thread_flag(TIF_NOHZ);
@@ -986,7 +986,7 @@ void cpuset_exit_nohz_interrupt(void *unused)
 void tick_nohz_pre_schedule(void)
 {
 	if (tick_nohz_adaptive_mode()) {
-		tick_nohz_flush_current_times();
+		tick_nohz_flush_current_times(true);
 		clear_thread_flag(TIF_NOHZ);
 	}
 }
@@ -1031,11 +1031,11 @@ bool tick_nohz_account_tick(void)
 	return true;
 }
 
-void tick_nohz_flush_current_times(void)
+void tick_nohz_flush_current_times(bool restart_tick)
 {
 	struct tick_sched *ts = &__get_cpu_var(tick_cpu_sched);
 
-	if (tick_nohz_account_tick())
+	if (tick_nohz_account_tick() && restart_tick)
 		ts->saved_jiffies_whence = JIFFIES_SAVED_NONE;
 }
 #else
