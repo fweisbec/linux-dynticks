@@ -547,6 +547,8 @@ static void tick_nohz_cpuset_stop_tick(struct tick_sched *ts)
 		if (user) {
 			ts->saved_jiffies_whence = JIFFIES_SAVED_USER;
 			ts->saved_jiffies = jiffies;
+			__get_cpu_var(nohz_task_ext_qs) = 1;
+			rcu_user_enter_irq();
 		} else if (!current->mm) {
 			ts->saved_jiffies_whence = JIFFIES_SAVED_SYS;
 			ts->saved_jiffies = jiffies;
@@ -875,6 +877,8 @@ void tick_check_idle(int cpu)
 }
 
 #ifdef CONFIG_CPUSETS_NO_HZ
+DEFINE_PER_CPU(int, nohz_task_ext_qs);
+
 void tick_nohz_exit_kernel(void)
 {
 	unsigned long flags;
@@ -898,6 +902,9 @@ void tick_nohz_exit_kernel(void)
 	ts->saved_jiffies = jiffies;
 	ts->saved_jiffies_whence = JIFFIES_SAVED_USER;
 
+	__get_cpu_var(nohz_task_ext_qs) = 1;
+	rcu_user_enter();
+
 	local_irq_restore(flags);
 }
 
@@ -916,6 +923,11 @@ void tick_nohz_enter_kernel(void)
 		return;
 	}
 
+	if (__get_cpu_var(nohz_task_ext_qs) == 1) {
+		__get_cpu_var(nohz_task_ext_qs) = 0;
+		rcu_user_exit();
+	}
+
 	WARN_ON_ONCE(ts->saved_jiffies_whence != JIFFIES_SAVED_USER);
 
 	delta_jiffies = jiffies - ts->saved_jiffies;
@@ -925,6 +937,14 @@ void tick_nohz_enter_kernel(void)
 	ts->saved_jiffies_whence = JIFFIES_SAVED_SYS;
 
 	local_irq_restore(flags);
+}
+
+void tick_nohz_cpu_exit_qs(void)
+{
+	if (__get_cpu_var(nohz_task_ext_qs)) {
+		rcu_user_exit_irq();
+		__get_cpu_var(nohz_task_ext_qs) = 0;
+	}
 }
 
 void tick_nohz_enter_exception(struct pt_regs *regs)
@@ -962,6 +982,7 @@ static void tick_nohz_restart_adaptive(void)
 	tick_nohz_flush_current_times(true);
 	tick_nohz_restart_sched_tick();
 	clear_thread_flag(TIF_NOHZ);
+	tick_nohz_cpu_exit_qs();
 }
 
 void tick_nohz_check_adaptive(void)
@@ -995,6 +1016,7 @@ void tick_nohz_pre_schedule(void)
 	if (ts->tick_stopped) {
 		tick_nohz_flush_current_times(true);
 		clear_thread_flag(TIF_NOHZ);
+		/* FIXME: warn if we are in RCU idle mode */
 	}
 }
 
