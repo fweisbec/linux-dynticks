@@ -264,6 +264,7 @@ finish:
 void smp_reschedule_interrupt(struct pt_regs *regs)
 {
 	ack_APIC_irq();
+	trace_printk("IPI: Scheduler\n");
 	inc_irq_stat(irq_resched_count);
 	scheduler_ipi();
 	/*
@@ -276,6 +277,7 @@ void smp_cpuset_update_nohz_interrupt(struct pt_regs *regs)
 {
 	ack_APIC_irq();
 	irq_enter();
+	trace_printk("IPI: Nohz update\n");
 	tick_nohz_check_adaptive();
 	inc_irq_stat(irq_call_count);
 	irq_exit();

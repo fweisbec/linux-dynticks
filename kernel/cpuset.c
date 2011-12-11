@@ -1206,6 +1206,7 @@ static cpumask_t nohz_cpuset_mask;
 
 static void flush_cputime_interrupt(void *unused)
 {
+	trace_printk("IPI: flush cputime\n");
 	tick_nohz_flush_current_times(false);
 }
 
