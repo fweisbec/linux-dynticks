@@ -423,6 +423,7 @@ void rcu_idle_enter(void)
 
 void rcu_user_enter(void)
 {
+	trace_dump_stack();
 	__rcu_idle_enter();
 }
 
@@ -436,6 +437,7 @@ void rcu_user_enter_irq(void)
 	WARN_ON_ONCE(rdtp->dynticks_nesting == 1);
 	rdtp->dynticks_nesting = 1;
 	local_irq_restore(flags);
+	trace_dump_stack();
 }
 
 /**
@@ -550,6 +552,7 @@ void rcu_user_exit(void)
 	rdtp = &__get_cpu_var(rcu_dynticks);
 	 __rcu_idle_exit(rdtp);
 	local_irq_restore(flags);
+	trace_dump_stack();
 }
 
 void rcu_user_exit_irq(void)
@@ -557,6 +560,7 @@ void rcu_user_exit_irq(void)
 	unsigned long flags;
 	struct rcu_dynticks *rdtp;
 
+	trace_dump_stack();
 	local_irq_save(flags);
 	rdtp = &__get_cpu_var(rcu_dynticks);
 	WARN_ON_ONCE(rdtp->dynticks_nesting == 0);

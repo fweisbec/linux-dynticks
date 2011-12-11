@@ -247,7 +247,15 @@ static inline int rcu_is_cpu_idle(void)
 
 static inline void rcu_lock_acquire(struct lockdep_map *map)
 {
-	WARN_ON_ONCE(rcu_is_cpu_idle());
+	if (WARN_ON_ONCE(rcu_is_cpu_idle())) {
+		static int done;
+
+		if (!done) {
+			done = 1;
+			trace_dump_stack();
+			ftrace_dump(DUMP_ORIG);
+		}
+	}
 	lock_acquire(map, 0, 0, 2, 1, NULL, _THIS_IP_);
 }
 

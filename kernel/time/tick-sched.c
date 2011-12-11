@@ -373,6 +373,7 @@ static ktime_t tick_nohz_stop_sched_tick(struct tick_sched *ts,
 		if (!ts->tick_stopped) {
 			ts->last_tick = hrtimer_get_expires(&ts->sched_timer);
 			ts->tick_stopped = 1;
+			trace_printk("Stop tick\n");
 		}
 
 		/*
@@ -559,6 +560,7 @@ static void tick_nohz_cpuset_stop_tick(struct tick_sched *ts)
 		smp_wmb();
 
 		set_thread_flag(TIF_NOHZ);
+		trace_printk("set TIF_NOHZ\n");
 	}
 }
 #else
@@ -636,6 +638,7 @@ static void __tick_nohz_restart_sched_tick(struct tick_sched *ts, ktime_t now)
 	ts->idle_exittime = now;
 
 	tick_nohz_restart(ts, now);
+	trace_printk("Restart sched tick\n");
 }
 
 /**
@@ -986,6 +989,7 @@ static void tick_nohz_restart_adaptive(void)
 	__get_cpu_var(task_nohz_mode) = 0;
 	tick_nohz_restart_sched_tick();
 	clear_thread_flag(TIF_NOHZ);
+	trace_printk("clear TIF_NOHZ\n");
 	tick_nohz_cpu_exit_qs(true);
 }
 
@@ -1011,6 +1015,7 @@ void tick_nohz_pre_schedule(void)
 	if (tick_nohz_adaptive_mode()) {
 		tick_nohz_flush_current_times(true);
 		clear_thread_flag(TIF_NOHZ);
+		trace_printk("clear TIF_NOHZ\n");
 		/* FIXME: warn if we are in RCU idle mode */
 	}
 }
@@ -1124,6 +1129,7 @@ static enum hrtimer_restart tick_sched_timer(struct hrtimer *timer)
 		}
 		update_process_times(user);
 		profile_tick(CPU_PROFILING);
+		trace_printk("tick\n");
 	}
 
 	hrtimer_forward(timer, now, tick_period);
