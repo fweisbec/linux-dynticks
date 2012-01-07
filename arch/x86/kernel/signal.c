@@ -19,6 +19,7 @@
 #include <linux/uaccess.h>
 #include <linux/user-return-notifier.h>
 #include <linux/uprobes.h>
+#include <linux/tick.h>
 
 #include <asm/processor.h>
 #include <asm/ucontext.h>
@@ -776,6 +777,7 @@ static void do_signal(struct pt_regs *regs)
 void
 do_notify_resume(struct pt_regs *regs, void *unused, __u32 thread_info_flags)
 {
+	tick_nohz_enter_kernel();
 #ifdef CONFIG_X86_MCE
 	/* notify userspace of pending MCEs */
 	if (thread_info_flags & _TIF_MCE_NOTIFY)
@@ -801,6 +803,7 @@ do_notify_resume(struct pt_regs *regs, void *unused, __u32 thread_info_flags)
 #ifdef CONFIG_X86_32
 	clear_thread_flag(TIF_IRET);
 #endif /* CONFIG_X86_32 */
+	tick_nohz_exit_kernel();
 }
 
 void signal_fault(struct pt_regs *regs, void __user *frame, char *where)
