@@ -4671,6 +4671,15 @@ asmlinkage void __sched preempt_schedule_irq(void)
 	/* Catch callers which need to be fixed */
 	BUG_ON(ti->preempt_count || !irqs_disabled());
 
+	/*
+	 * We may arrive here before resuming userspace.
+	 * If we are running tickless, RCU may be in idle
+	 * mode. We need to reenable RCU for the next task
+	 * and also in case preempt_schedule_irq() make use
+	 * of RCU itself.
+	 */
+	tick_nohz_cpu_exit_qs(false);
+
 	do {
 		add_preempt_count(PREEMPT_ACTIVE);
 		local_irq_enable();
