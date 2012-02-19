@@ -1,7 +1,7 @@
 VERSION = 3
 PATCHLEVEL = 2
 SUBLEVEL = 0
-EXTRAVERSION = -rc3
+EXTRAVERSION = -rc3-tickless-v2-pre-20120220
 NAME = Saber-toothed Squirrel
 
 # *DOCUMENTATION*
