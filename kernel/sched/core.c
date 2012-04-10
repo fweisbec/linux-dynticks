@@ -1466,6 +1466,12 @@ ttwu_do_wakeup(struct rq *rq, struct task_struct *p, int wake_flags)
 	if (p->sched_class->task_woken)
 		p->sched_class->task_woken(rq, p);
 
+	/*
+	 * For adaptive nohz case: We called ttwu_activate()
+	 * which just updated the rq clock. There is an
+	 * exception with p->on_rq != 0 but in this case
+	 * we are not idle and rq->idle_stamp == 0
+	 */
 	if (rq->idle_stamp) {
 		u64 delta = rq->clock - rq->idle_stamp;
 		u64 max = 2*sysctl_sched_migration_cost;
