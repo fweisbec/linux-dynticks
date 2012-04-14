@@ -1510,6 +1510,12 @@ static int ttwu_remote(struct task_struct *p, int wake_flags)
 
 	rq = __task_rq_lock(p);
 	if (p->on_rq) {
+		/*
+		 * Ensure check_preempt_curr() won't deal with a stale value
+		 * of rq clock if the CPU is tickless. BTW do we actually need
+		 * check_preempt_curr() to be called here?
+		 */
+		update_nohz_rq_clock(rq);
 		ttwu_do_wakeup(rq, p, wake_flags);
 		ret = 1;
 	}
@@ -1719,8 +1725,17 @@ static void try_to_wake_up_local(struct task_struct *p)
 	if (!(p->state & TASK_NORMAL))
 		goto out;
 
-	if (!p->on_rq)
+	if (!p->on_rq) {
 		ttwu_activate(rq, p, ENQUEUE_WAKEUP);
+	} else {
+		/*
+		 * Even if the task is on the runqueue we still
+		 * need to ensure check_preempt_curr() won't
+		 * deal with a stale rq clock value on a tickless
+		 * CPU
+		 */
+		update_nohz_rq_clock(rq);
+	}
 
 	ttwu_do_wakeup(rq, p, 0);
 	ttwu_stat(p, smp_processor_id(), 0);
