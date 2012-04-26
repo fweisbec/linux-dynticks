@@ -862,6 +862,8 @@ static void update_tasks_cpumask(struct cpuset *cs, struct ptr_heap *heap)
 	cgroup_scan_tasks(&scan);
 }
 
+static void update_nohz_cpus(struct cpuset *old_cs, struct cpuset *cs);
+
 /**
  * update_cpumask - update the cpus_allowed mask of a cpuset and all tasks in it
  * @cs: the cpuset to consider
@@ -901,6 +903,11 @@ static int update_cpumask(struct cpuset *cs, struct cpuset *trialcs,
 	/* Nothing to do if the cpus didn't change */
 	if (cpumask_equal(cs->cpus_allowed, trialcs->cpus_allowed))
 		return 0;
+
+	/*
+	 * Update adaptive nohz bits.
+	 */
+	update_nohz_cpus(cs, trialcs);
 
 	retval = heap_init(&heap, PAGE_SIZE, GFP_KERNEL, NULL);
 	if (retval)
@@ -1220,50 +1227,75 @@ static void cpu_exit_nohz(int cpu)
 	preempt_enable();
 }
 
-static void update_nohz_cpus(struct cpuset *old_cs, struct cpuset *cs)
+static void update_cpu_nohz_flag(int cpu, int adjust)
+{
+	atomic_t *ref = &per_cpu(cpu_adaptive_nohz_ref, cpu);
+	int val;
+
+	val = atomic_add_return(adjust, ref);
+
+	if (val == 1 && adjust > 0) {
+		cpumask_set_cpu(cpu, &nohz_cpuset_mask);
+		/*
+		 * The mask update needs to be visible right away
+		 * so that this CPU is part of the cputime IPI
+		 * update right now.
+		 */
+		 smp_mb();
+	} else if (!val) {
+		/*
+		 * The update to cpu_adaptive_nohz_ref must be
+		 * visible right away. So that once we restart the tick
+		 * from the IPI, it won't be stopped again due to cache
+		 * update lag.
+		 * FIXME: We probably need more to ensure this value is really
+		 * visible right away.
+		 */
+		smp_mb();
+		cpu_exit_nohz(cpu);
+		/*
+		 * Now that the tick has been restarted and cputimes
+		 * flushed, we don't need anymore to be part of the
+		 * cputime flush IPI.
+		 */
+		cpumask_clear_cpu(cpu, &nohz_cpuset_mask);
+	}
+}
+
+static void update_nohz_flag(struct cpuset *old_cs, struct cpuset *cs)
 {
 	int cpu;
-	int val;
+	int adjust;
 
 	if (is_adaptive_nohz(old_cs) == is_adaptive_nohz(cs))
 		return;
 
-	for_each_cpu(cpu, cs->cpus_allowed) {
-		atomic_t *ref = &per_cpu(cpu_adaptive_nohz_ref, cpu);
-		if (is_adaptive_nohz(cs))
-			val = atomic_inc_return(ref);
-		else
-			val = atomic_dec_return(ref);
+	adjust = is_adaptive_nohz(cs) ? 1 : -1;
+	for_each_cpu(cpu, cs->cpus_allowed)
+		update_cpu_nohz_flag(cpu, adjust);
+}
 
-		if (val == 1) {
-			cpumask_set_cpu(cpu, &nohz_cpuset_mask);
-			/*
-			 * The mask update needs to be visible right away
-			 * so that this CPU is part of the cputime IPI
-			 * update right now.
-			 */
-			 smp_mb();
-		} else if (!val) {
-			/*
-			 * The update to cpu_adaptive_nohz_ref must be
-			 * visible right away. So that once we restart the tick
-			 * from the IPI, it won't be stopped again due to cache
-			 * update lag.
-			 * FIXME: We probably need more to ensure this value is really
-			 * visible right away.
-			 */
-			smp_mb();
-			cpu_exit_nohz(cpu);
-			/*
-			 * Now that the tick has been restarted and cputimes
-			 * flushed, we don't need anymore to be part of the
-			 * cputime flush IPI.
-			 */
-			cpumask_clear_cpu(cpu, &nohz_cpuset_mask);
-		}
-	}
+static void update_nohz_cpus(struct cpuset *old_cs, struct cpuset *cs)
+{
+	int cpu;
+	cpumask_t cpus;
+
+	/*
+	 * Only bother if the cpuset has adaptive nohz
+	 */
+	if (!is_adaptive_nohz(cs))
+		return;
+
+	cpumask_xor(&cpus, old_cs->cpus_allowed, cs->cpus_allowed);
+
+	for_each_cpu(cpu, &cpus)
+		update_cpu_nohz_flag(cpu,
+			cpumask_test_cpu(cpu, cs->cpus_allowed) ? 1 : -1);
 }
 #else
+static inline void update_nohz_flag(struct cpuset *old_cs, struct cpuset *cs)
+{
+}
 static inline void update_nohz_cpus(struct cpuset *old_cs, struct cpuset *cs)
 {
 }
@@ -1334,7 +1366,7 @@ static int update_flag(cpuset_flagbits_t bit, struct cpuset *cs,
 	spread_flag_changed = ((is_spread_slab(cs) != is_spread_slab(trialcs))
 			|| (is_spread_page(cs) != is_spread_page(trialcs)));
 
-	update_nohz_cpus(cs, trialcs);
+	update_nohz_flag(cs, trialcs);
 
 	mutex_lock(&callback_mutex);
 	cs->flags = trialcs->flags;
@@ -1959,7 +1991,8 @@ static struct cgroup_subsys_state *cpuset_create(struct cgroup *cont)
 /*
  * If the cpuset being removed has its flag 'sched_load_balance'
  * enabled, then simulate turning sched_load_balance off, which
- * will call async_rebuild_sched_domains().
+ * will call async_rebuild_sched_domains(). Also update adaptive
+ * nohz flag.
  */
 
 static void cpuset_destroy(struct cgroup *cont)
@@ -1968,6 +2001,8 @@ static void cpuset_destroy(struct cgroup *cont)
 
 	if (is_sched_load_balance(cs))
 		update_flag(CS_SCHED_LOAD_BALANCE, cs, 0);
+
+	update_flag(CS_ADAPTIVE_NOHZ, cs, 0);
 
 	number_of_cpusets--;
 	free_cpumask_var(cs->cpus_allowed);
