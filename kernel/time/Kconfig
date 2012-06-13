@@ -65,6 +65,13 @@ config NO_HZ
 	  This option enables a tickless idle system: timer interrupts will
 	  only trigger on an as-needed basis when the system is idle.
 
+config NO_HZ_FULL
+        bool "Full tickless system (Dynamic Ticks)"
+	depends on NO_HZ && HAVE_NO_HZ_FULL
+	help
+	  This option enables a full adaptive tickless system: timer
+	  interrupts will globally only trigger on an as-needed basis.
+
 config HIGH_RES_TIMERS
 	bool "High Resolution Timer Support"
 	depends on !ARCH_USES_GETTIMEOFFSET && GENERIC_CLOCKEVENTS
