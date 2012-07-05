@@ -56,6 +56,7 @@
 #include <asm/ftrace.h>
 #include <asm/percpu.h>
 #include <asm/asm.h>
+#include <asm/rcu.h>
 #include <linux/err.h>
 
 /* Avoid __ASSEMBLER__'ifying <linux/audit.h> just for this.  */
@@ -517,6 +518,22 @@ GLOBAL(system_call_after_swapgs)
 	movq  %rax,ORIG_RAX-ARGOFFSET(%rsp)
 	movq  %rcx,RIP-ARGOFFSET(%rsp)
 	CFI_REL_OFFSET rip,RIP-ARGOFFSET
+#ifdef CONFIG_RCU_USER_QS
+	ENTER_KERNEL
+	/*
+	 * Syscall args/scratch reg might have been
+	 * clobbered by rcu_user_exit() call. Restore
+	 * them.
+	 */
+	movq RDI-ARGOFFSET(%rsp), %rdi
+	movq RSI-ARGOFFSET(%rsp), %rsi
+	movq RDX-ARGOFFSET(%rsp), %rdx
+	movq R8-ARGOFFSET(%rsp), %r8
+	movq R9-ARGOFFSET(%rsp), %r9
+	movq ORIG_RAX-ARGOFFSET(%rsp), %rax
+	movq R10-ARGOFFSET(%rsp), %r10
+	movq R11-ARGOFFSET(%rsp), %r11
+#endif
 	testl $_TIF_WORK_SYSCALL_ENTRY,TI_flags+THREAD_INFO(%rsp,RIP-ARGOFFSET)
 	jnz tracesys
 system_call_fastpath:
@@ -544,6 +561,7 @@ sysret_check:
 	movl TI_flags+THREAD_INFO(%rsp,RIP-ARGOFFSET),%edx
 	andl %edi,%edx
 	jnz  sysret_careful
+	EXIT_KERNEL
 	CFI_REMEMBER_STATE
 	/*
 	 * sysretq will re-enable interrupts:
@@ -925,6 +943,7 @@ retint_swapgs:		/* return to user-space */
 	 */
 	DISABLE_INTERRUPTS(CLBR_ANY)
 	TRACE_IRQS_IRETQ
+	EXIT_KERNEL
 	SWAPGS
 	jmp restore_args
 
@@ -1101,6 +1120,7 @@ ENTRY(\sym)
 	subq $ORIG_RAX-R15, %rsp
 	CFI_ADJUST_CFA_OFFSET ORIG_RAX-R15
 	call error_entry
+	ENTER_KERNEL
 	DEFAULT_FRAME 0
 	movq %rsp,%rdi		/* pt_regs pointer */
 	xorl %esi,%esi		/* no error code */
@@ -1119,6 +1139,7 @@ ENTRY(\sym)
 	CFI_ADJUST_CFA_OFFSET ORIG_RAX-R15
 	call save_paranoid
 	TRACE_IRQS_OFF
+	ENTER_KERNEL
 	movq %rsp,%rdi		/* pt_regs pointer */
 	xorl %esi,%esi		/* no error code */
 	call \do_sym
@@ -1137,6 +1158,7 @@ ENTRY(\sym)
 	CFI_ADJUST_CFA_OFFSET ORIG_RAX-R15
 	call save_paranoid
 	TRACE_IRQS_OFF_DEBUG
+	ENTER_KERNEL
 	movq %rsp,%rdi		/* pt_regs pointer */
 	xorl %esi,%esi		/* no error code */
 	subq $EXCEPTION_STKSZ, INIT_TSS_IST(\ist)
@@ -1154,6 +1176,7 @@ ENTRY(\sym)
 	subq $ORIG_RAX-R15, %rsp
 	CFI_ADJUST_CFA_OFFSET ORIG_RAX-R15
 	call error_entry
+	ENTER_KERNEL
 	DEFAULT_FRAME 0
 	movq %rsp,%rdi			/* pt_regs pointer */
 	movq ORIG_RAX(%rsp),%rsi	/* get error code */
@@ -1172,6 +1195,7 @@ ENTRY(\sym)
 	subq $ORIG_RAX-R15, %rsp
 	CFI_ADJUST_CFA_OFFSET ORIG_RAX-R15
 	call save_paranoid
+	ENTER_KERNEL
 	DEFAULT_FRAME 0
 	TRACE_IRQS_OFF
 	movq %rsp,%rdi			/* pt_regs pointer */
@@ -1437,6 +1461,7 @@ ENTRY(paranoid_exit)
 	testl $3,CS(%rsp)
 	jnz   paranoid_userspace
 paranoid_swapgs:
+	EXIT_KERNEL
 	TRACE_IRQS_IRETQ 0
 	SWAPGS_UNSAFE_STACK
 	RESTORE_ALL 8
