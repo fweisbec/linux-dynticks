@@ -3332,6 +3332,12 @@ asmlinkage void __sched schedule(void)
 }
 EXPORT_SYMBOL(schedule);
 
+asmlinkage void __sched schedule_user(void)
+{
+	rcu_user_exit();
+	schedule();
+}
+
 /**
  * schedule_preempt_disabled - called with preemption disabled
  *
@@ -3433,6 +3439,7 @@ asmlinkage void __sched preempt_schedule_irq(void)
 	/* Catch callers which need to be fixed */
 	BUG_ON(ti->preempt_count || !irqs_disabled());
 
+	rcu_user_exit();
 	do {
 		add_preempt_count(PREEMPT_ACTIVE);
 		local_irq_enable();
