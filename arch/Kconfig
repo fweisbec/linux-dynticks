@@ -274,4 +274,17 @@ config SECCOMP_FILTER
 
 	  See Documentation/prctl/seccomp_filter.txt for details.
 
+config HAVE_RCU_USER_QS
+	bool
+	help
+	  Provide kernel entry/exit hooks necessary for userspace
+	  RCU extended quiescent state. Syscalls and exceptions
+	  low level handlers must be wrapped with a call to rcu_user_exit()
+	  on entry and rcu_user_enter() before resuming userspace. Irqs
+	  entry don't need to call rcu_user_exit() because their high level
+	  handlers are protected inside rcu_irq_enter/rcu_irq_exit() but
+	  preemption or signal handling on irq exit still need to be protected
+	  with a call to rcu_user_exit(). rcu_user_enter() must then be
+	  called back on irq exit when the preempted task is back on the CPU.
+
 source "kernel/gcov/Kconfig"

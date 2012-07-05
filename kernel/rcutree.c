@@ -423,6 +423,7 @@ void rcu_idle_enter(void)
 }
 EXPORT_SYMBOL_GPL(rcu_idle_enter);
 
+#ifdef CONFIG_RCU_USER_QS
 /**
  * rcu_user_enter - inform RCU that we are resuming userspace.
  *
@@ -436,6 +437,7 @@ void rcu_user_enter(void)
 	rcu_eqs_enter(1);
 }
 EXPORT_SYMBOL_GPL(rcu_user_enter);
+#endif
 
 
 /**
@@ -561,6 +563,7 @@ void rcu_idle_exit(void)
 }
 EXPORT_SYMBOL_GPL(rcu_idle_exit);
 
+#ifdef CONFIG_RCU_USER_QS
 /**
  * rcu_user_exit - inform RCU that we are exiting userspace.
  *
@@ -572,6 +575,7 @@ void rcu_user_exit(void)
 	rcu_eqs_exit(1);
 }
 EXPORT_SYMBOL_GPL(rcu_user_exit);
+#endif
 
 /**
  * rcu_user_exit_irq - inform RCU that we won't resume to userspace
