@@ -344,6 +344,10 @@ static int rcu_implicit_offline_qs(struct rcu_data *rdp)
 	return 0;
 }
 
+#ifdef CONFIG_RCU_USER_QS
+static DEFINE_PER_CPU(bool, in_user);
+#endif
+
 /*
  * rcu_eqs_enter_common - current CPU is moving towards extended quiescent state
  *
@@ -389,11 +393,9 @@ static void rcu_eqs_enter_common(struct rcu_dynticks *rdtp, long long oldval,
  */
 static void rcu_eqs_enter(bool user)
 {
-	unsigned long flags;
 	long long oldval;
 	struct rcu_dynticks *rdtp;
 
-	local_irq_save(flags);
 	rdtp = &__get_cpu_var(rcu_dynticks);
 	oldval = rdtp->dynticks_nesting;
 	WARN_ON_ONCE((oldval & DYNTICK_TASK_NEST_MASK) == 0);
@@ -402,7 +404,6 @@ static void rcu_eqs_enter(bool user)
 	else
 		rdtp->dynticks_nesting -= DYNTICK_TASK_NEST_VALUE;
 	rcu_eqs_enter_common(rdtp, oldval, user);
-	local_irq_restore(flags);
 }
 
 /**
@@ -419,7 +420,11 @@ static void rcu_eqs_enter(bool user)
  */
 void rcu_idle_enter(void)
 {
+	unsigned long flags;
+
+	local_irq_save(flags);
 	rcu_eqs_enter(0);
+	local_irq_restore(flags);
 }
 EXPORT_SYMBOL_GPL(rcu_idle_enter);
 
@@ -434,7 +439,16 @@ EXPORT_SYMBOL_GPL(rcu_idle_enter);
  */
 void rcu_user_enter(void)
 {
-	rcu_eqs_enter(1);
+	unsigned long flags;
+
+	WARN_ON_ONCE(!current->mm);
+
+	local_irq_save(flags);
+	if (!this_cpu_read(in_user)) {
+		this_cpu_write(in_user, true);
+		rcu_eqs_enter(1);
+	}
+	local_irq_restore(flags);
 }
 EXPORT_SYMBOL_GPL(rcu_user_enter);
 #endif
@@ -530,11 +544,9 @@ static void rcu_eqs_exit_common(struct rcu_dynticks *rdtp, long long oldval,
  */
 static void rcu_eqs_exit(bool user)
 {
-	unsigned long flags;
 	struct rcu_dynticks *rdtp;
 	long long oldval;
 
-	local_irq_save(flags);
 	rdtp = &__get_cpu_var(rcu_dynticks);
 	oldval = rdtp->dynticks_nesting;
 	WARN_ON_ONCE(oldval < 0);
@@ -543,7 +555,6 @@ static void rcu_eqs_exit(bool user)
 	else
 		rdtp->dynticks_nesting = DYNTICK_TASK_EXIT_IDLE;
 	rcu_eqs_exit_common(rdtp, oldval, user);
-	local_irq_restore(flags);
 }
 
 /**
@@ -559,7 +570,11 @@ static void rcu_eqs_exit(bool user)
  */
 void rcu_idle_exit(void)
 {
+	unsigned long flags;
+
+	local_irq_save(flags);
 	rcu_eqs_exit(0);
+	local_irq_restore(flags);
 }
 EXPORT_SYMBOL_GPL(rcu_idle_exit);
 
@@ -572,7 +587,14 @@ EXPORT_SYMBOL_GPL(rcu_idle_exit);
  */
 void rcu_user_exit(void)
 {
-	rcu_eqs_exit(1);
+	unsigned long flags;
+
+	local_irq_save(flags);
+	if (this_cpu_read(in_user)) {
+		this_cpu_write(in_user, false);
+		rcu_eqs_exit(1);
+	}
+	local_irq_restore(flags);
 }
 EXPORT_SYMBOL_GPL(rcu_user_exit);
 #endif
