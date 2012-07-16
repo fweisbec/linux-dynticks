@@ -144,7 +144,7 @@ EXPORT_SYMBOL_GPL(account_system_vtime);
  * Called from the timer interrupt handler to charge accumulated user time
  * to the current process.  Must be called with interrupts disabled.
  */
-void account_process_tick(struct task_struct *p, int user_tick)
+void account_process_tick_vtime(struct task_struct *p, int user_tick)
 {
 	struct thread_info *ti = task_thread_info(p);
 	cputime_t delta_utime;
