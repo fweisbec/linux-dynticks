@@ -354,7 +354,7 @@ EXPORT_SYMBOL_GPL(account_system_vtime);
  * (i.e. since the last entry from usermode) so that
  * get_paca()->user_time_scaled is up to date.
  */
-void account_process_tick(struct task_struct *tsk, int user_tick)
+void account_process_tick_vtime(struct task_struct *tsk, int user_tick)
 {
 	cputime_t utime, utimescaled;
 

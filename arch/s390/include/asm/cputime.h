@@ -188,4 +188,9 @@ static inline int s390_nohz_delay(int cpu)
 
 #define arch_needs_cpu(cpu) s390_nohz_delay(cpu)
 
+static inline bool accounting_vtime(void)
+{
+	return true;
+}
+
 #endif /* _S390_CPUTIME_H */

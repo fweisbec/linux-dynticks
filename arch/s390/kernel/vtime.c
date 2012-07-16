@@ -99,7 +99,7 @@ void account_switch_vtime(struct task_struct *prev)
 	S390_lowcore.system_timer = ti->system_timer;
 }
 
-void account_process_tick(struct task_struct *tsk, int user_tick)
+void account_process_tick_vtime(struct task_struct *tsk, int user_tick)
 {
 	do_account_vtime(tsk, HARDIRQ_OFFSET);
 }
