@@ -557,9 +557,7 @@ void tick_nohz_idle_exit(void)
 {
 	int cpu = smp_processor_id();
 	struct tick_sched *ts = &per_cpu(tick_cpu_sched, cpu);
-#ifndef CONFIG_VIRT_CPU_ACCOUNTING
 	unsigned long ticks;
-#endif
 	ktime_t now;
 
 	local_irq_disable();
@@ -584,19 +582,19 @@ void tick_nohz_idle_exit(void)
 	tick_do_update_jiffies64(now);
 	update_cpu_load_nohz();
 
-#ifndef CONFIG_VIRT_CPU_ACCOUNTING
-	/*
-	 * We stopped the tick in idle. Update process times would miss the
-	 * time we slept as update_process_times does only a 1 tick
-	 * accounting. Enforce that this is accounted to idle !
-	 */
-	ticks = jiffies - ts->idle_jiffies;
-	/*
-	 * We might be one off. Do not randomly account a huge number of ticks!
-	 */
-	if (ticks && ticks < LONG_MAX)
-		account_idle_ticks(ticks);
-#endif
+	if (!accounting_vtime()) {
+		/*
+		 * We stopped the tick in idle. Update process times would miss the
+		 * time we slept as update_process_times does only a 1 tick
+		 * accounting. Enforce that this is accounted to idle !
+		 */
+		ticks = jiffies - ts->idle_jiffies;
+		/*
+		 * We might be one off. Do not randomly account a huge number of ticks!
+		 */
+		if (ticks && ticks < LONG_MAX)
+			account_idle_ticks(ticks);
+	}
 
 	calc_load_exit_idle();
 	touch_softlockup_watchdog();

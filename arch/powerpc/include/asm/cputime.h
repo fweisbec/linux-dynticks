@@ -228,6 +228,11 @@ static inline cputime_t clock_t_to_cputime(const unsigned long clk)
 
 #define cputime64_to_clock_t(ct)	cputime_to_clock_t((cputime_t)(ct))
 
+static inline bool accounting_vtime(void)
+{
+	return true;
+}
+
 #endif /* __KERNEL__ */
 #endif /* CONFIG_VIRT_CPU_ACCOUNTING */
 #endif /* __POWERPC_CPUTIME_H */

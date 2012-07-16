@@ -103,5 +103,10 @@ static inline void cputime_to_timeval(const cputime_t ct, struct timeval *val)
 #define cputime64_to_clock_t(__ct)	\
 	cputime_to_clock_t((__force cputime_t)__ct)
 
+static inline bool accounting_vtime(void)
+{
+	return true;
+}
+
 #endif /* CONFIG_VIRT_CPU_ACCOUNTING */
 #endif /* __IA64_CPUTIME_H */
