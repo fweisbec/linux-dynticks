@@ -18,7 +18,7 @@
 #include <asm/pgalloc.h>		/* pgd_*(), ...			*/
 #include <asm/kmemcheck.h>		/* kmemcheck_*(), ...		*/
 #include <asm/fixmap.h>			/* VSYSCALL_START		*/
-#include <asm/rcu.h>			/* exception_enter(), ...	*/
+#include <asm/code_domain.h>		/* exception_enter(), ...	*/
 
 /*
  * Page fault error code bits:
