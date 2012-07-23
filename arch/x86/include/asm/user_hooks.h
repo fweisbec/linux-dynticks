@@ -1,19 +1,19 @@
-#ifndef _ASM_X86_RCU_H
-#define _ASM_X86_RCU_H
+#ifndef _ASM_X86_USER_HOOKS_H
+#define _ASM_X86_USER_HOOKS_H
 
-#include <linux/rcupdate.h>
+#include <linux/user_hooks.h>
 #include <asm/ptrace.h>
 
 static inline void exception_enter(struct pt_regs *regs)
 {
-	rcu_user_exit();
+	user_exit();
 }
 
 static inline void exception_exit(struct pt_regs *regs)
 {
-#ifdef CONFIG_RCU_USER_QS
+#ifdef CONFIG_USER_HOOKS
 	if (user_mode(regs))
-		rcu_user_enter();
+		user_enter();
 #endif
 }
 
