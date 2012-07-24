@@ -108,7 +108,7 @@ void account_process_tick_vtime(struct task_struct *tsk, int user_tick)
  * Update process times based on virtual cpu times stored by entry.S
  * to the lowcore fields user_timer, system_timer & steal_clock.
  */
-void account_system_vtime(struct task_struct *tsk)
+void account_vtime(struct task_struct *tsk)
 {
 	struct thread_info *ti = task_thread_info(tsk);
 	__u64 timer, system;
@@ -122,7 +122,7 @@ void account_system_vtime(struct task_struct *tsk)
 	ti->system_timer = S390_lowcore.system_timer;
 	account_system_time(tsk, 0, system, system);
 }
-EXPORT_SYMBOL_GPL(account_system_vtime);
+EXPORT_SYMBOL_GPL(account_vtime);
 
 void __kprobes vtime_stop_cpu(void)
 {

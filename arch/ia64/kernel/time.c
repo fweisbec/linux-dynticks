@@ -116,7 +116,7 @@ void account_switch_vtime(struct task_struct *prev)
  * Account time for a transition between system, hard irq or soft irq state.
  * Note that this function is called with interrupts enabled.
  */
-void account_system_vtime(struct task_struct *tsk)
+void account_vtime(struct task_struct *tsk)
 {
 	struct thread_info *ti = task_thread_info(tsk);
 	unsigned long flags;
@@ -138,7 +138,7 @@ void account_system_vtime(struct task_struct *tsk)
 
 	local_irq_restore(flags);
 }
-EXPORT_SYMBOL_GPL(account_system_vtime);
+EXPORT_SYMBOL_GPL(account_vtime);
 
 /*
  * Called from the timer interrupt handler to charge accumulated user time
