@@ -269,7 +269,9 @@ config POSIX_MQUEUE_SYSCTL
 
 config VIRT_CPU_ACCOUNTING
 	bool "Deterministic task and CPU time accounting"
-	depends on HAVE_VIRT_CPU_ACCOUNTING && !IRQ_TIME_ACCOUNTING
+	depends on HAVE_VIRT_CPU_ACCOUNTING || HAVE_CODE_DOMAIN_TRACKING
+	depends on !IRQ_TIME_ACCOUNTING
+	select VIRT_CPU_ACCOUNTING_GEN if !HAVE_VIRT_CPU_ACCOUNTING
 	default y if PPC64
 	help
 	  Select this option to enable more accurate task and CPU time
@@ -279,6 +281,13 @@ config VIRT_CPU_ACCOUNTING
 	  small performance impact.  This also enables accounting of
 	  stolen time on logically-partitioned systems running on
 	  IBM POWER5-based machines.
+
+config VIRT_CPU_ACCOUNTING_GEN
+	select CODE_DOMAIN_TRACKING
+	bool
+	help
+	  Implement a generic virtual based cputime accounting by using
+	  the code domain tracking subsystem.
 
 config BSD_PROCESS_ACCT
 	bool "BSD Process Accounting"
