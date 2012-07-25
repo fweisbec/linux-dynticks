@@ -66,9 +66,11 @@ typedef u64 __nocast cputime64_t;
 #define cputime64_to_clock_t(__ct)	\
 	jiffies_64_to_clock_t(cputime64_to_jiffies64(__ct))
 
+#ifndef CONFIG_VIRT_CPU_ACCOUNTING_GEN
 static inline bool accounting_vtime(void)
 {
 	return false;
 }
+#endif
 
 #endif

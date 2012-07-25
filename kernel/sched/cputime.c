@@ -2,6 +2,7 @@
 #include <linux/sched.h>
 #include <linux/tsacct_kern.h>
 #include <linux/kernel_stat.h>
+#include <linux/user_hooks.h>
 #include "sched.h"
 
 
@@ -490,3 +491,114 @@ void thread_group_times(struct task_struct *p, cputime_t *ut, cputime_t *st)
 	*ut = sig->prev_utime;
 	*st = sig->prev_stime;
 }
+
+#ifdef CONFIG_VIRT_CPU_ACCOUNTING_GEN
+static DEFINE_PER_CPU(long, last_jiffies) = INITIAL_JIFFIES;
+
+static cputime_t get_vtime_delta(void)
+{
+	long delta;
+
+	delta = jiffies - __this_cpu_read(last_jiffies);
+	__this_cpu_add(last_jiffies, delta);
+
+	return jiffies_to_cputime(delta);
+}
+
+void account_system_vtime(struct task_struct *tsk)
+{
+	cputime_t delta_cpu = get_vtime_delta();
+
+	account_system_time(tsk, irq_count(), delta_cpu, cputime_to_scaled(delta_cpu));
+}
+
+void account_user_vtime(struct task_struct *tsk)
+{
+	cputime_t delta_cpu = get_vtime_delta();
+
+	account_user_time(tsk, delta_cpu, cputime_to_scaled(delta_cpu));
+}
+
+static void account_idle_vtime(void)
+{
+	cputime_t delta_cpu = get_vtime_delta();
+
+	account_idle_time(delta_cpu);
+}
+
+void account_vtime(struct task_struct *tsk)
+{
+	unsigned long count = irq_count();
+
+	if (!count) {
+		/*
+		 * If we interrupted user, in_user() is 1
+		 * because the user hooks subsys don't hook
+		 * on irq entry/exit. This way we know if
+		 * we need to flush user time on kernel entry.
+		 */
+		if (in_user())
+			account_user_vtime(tsk);
+	} else {
+		if (count == HARDIRQ_OFFSET ||
+		    count == SOFTIRQ_OFFSET) {
+			if (is_idle_task(tsk))
+				account_idle_vtime();
+			else
+				account_system_vtime(tsk);
+		}
+	}
+}
+
+void account_switch_vtime(struct task_struct *prev)
+{
+	if (is_idle_task(prev))
+		account_idle_vtime();
+	else
+		account_system_vtime(prev);
+}
+
+/*
+ * This is a kind of hack: if we flush user time only on
+ * irq entry, we miss the jiffies update and the time is spuriously
+ * accounted to system time.
+ */
+void account_process_tick_vtime(struct task_struct *p, int user_tick)
+{
+	if (in_user())
+		account_user_vtime(p);
+}
+
+bool accounting_vtime(void)
+{
+	return user_hooks_hooking();
+}
+
+static int __cpuinit vtime_cpu_notify(struct notifier_block *self,
+				      unsigned long action, void *hcpu)
+{
+	long cpu = (long)hcpu;
+	long *last_jiffies_cpu = per_cpu_ptr(&last_jiffies, cpu);
+
+	switch (action) {
+	case CPU_UP_PREPARE:
+	case CPU_UP_PREPARE_FROZEN:
+		/*
+		 * CHECKME: ensure that's visible by the CPU
+		 * once it wakes up
+		 */
+		*last_jiffies_cpu = jiffies;
+	default:
+		break;
+	}
+
+	return NOTIFY_OK;
+}
+
+static int __init init_vtime(void)
+{
+	cpu_notifier(vtime_cpu_notify, 0);
+	return 0;
+}
+early_initcall(init_vtime);
+#endif /* CONFIG_VIRT_CPU_ACCOUNTING_GEN */

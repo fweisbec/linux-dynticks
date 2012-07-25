@@ -3,6 +3,24 @@
 
 #ifdef CONFIG_USER_HOOKS
 #include <linux/sched.h>
+#include <linux/percpu.h>
+
+struct user_hooks {
+	bool hooking;
+	bool in_user;
+};
+
+DECLARE_PER_CPU(struct user_hooks, user_hooks);
+
+static inline bool in_user(void)
+{
+	return __get_cpu_var(user_hooks).in_user;
+}
+
+static inline bool user_hooks_hooking(void)
+{
+	return __get_cpu_var(user_hooks).hooking;
+}
 
 extern void user_enter(void);
 extern void user_exit(void);

@@ -1,12 +1,8 @@
 #include <linux/user_hooks.h>
 #include <linux/rcupdate.h>
 #include <linux/sched.h>
-#include <linux/percpu.h>
+#include <linux/kernel_stat.h>
 
-struct user_hooks {
-	bool hooking;
-	bool in_user;
-};
 
 DEFINE_PER_CPU(struct user_hooks, user_hooks) = {
 #ifdef CONFIG_USER_HOOKS_FORCE
@@ -24,6 +20,8 @@ void user_enter(void)
 	uh = &__get_cpu_var(user_hooks);
 	if (uh->hooking && !uh->in_user) {
 		uh->in_user = true;
+		if (accounting_vtime())
+			account_system_vtime(current);
 		rcu_user_enter();
 	}
 	local_irq_restore(flags);
@@ -39,6 +37,8 @@ void user_exit(void)
 	if (uh->in_user) {
 		uh->in_user = false;
 		rcu_user_exit();
+		if (accounting_vtime())
+			account_user_vtime(current);
 	}
 	local_irq_restore(flags);
 }
