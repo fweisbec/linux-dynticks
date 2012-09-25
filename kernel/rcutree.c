@@ -446,6 +446,9 @@ void rcu_user_enter(void)
 
 	WARN_ON_ONCE(!current->mm);
 
+	if (in_interrupt())
+		return;
+
 	local_irq_save(flags);
 	rdtp = &__get_cpu_var(rcu_dynticks);
 	if (!rdtp->ignore_user_qs && !rdtp->in_user) {
@@ -591,6 +594,9 @@ void rcu_user_exit(void)
 {
 	unsigned long flags;
 	struct rcu_dynticks *rdtp;
+
+	if (in_interrupt())
+		return;
 
 	local_irq_save(flags);
 	rdtp = &__get_cpu_var(rcu_dynticks);
