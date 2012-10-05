@@ -136,6 +136,7 @@ extern void vtime_account_system(struct task_struct *tsk);
 extern void vtime_account_idle(struct task_struct *tsk);
 #else
 static inline void vtime_task_switch(struct task_struct *prev) { }
+static inline void vtime_account_system(struct task_struct *tsk) { }
 #endif
 
 #endif /* _LINUX_KERNEL_STAT_H */
