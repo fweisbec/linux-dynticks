@@ -131,13 +131,65 @@ extern void synchronize_irq(unsigned int irq);
 
 struct task_struct;
 
-#if !defined(CONFIG_VIRT_CPU_ACCOUNTING) && !defined(CONFIG_IRQ_TIME_ACCOUNTING)
-static inline void vtime_account(struct task_struct *tsk)
-{
-}
-#else
+#ifdef CONFIG_TICK_CPU_ACCOUNTING
+static inline void vtime_account(struct task_struct *tsk) { }
+static inline void vtime_account_irq_enter(struct task_struct *tsk,
+					   unsigned long offset) { }
+static inline void vtime_account_irq_exit(struct task_struct *tsk,
+					  unsigned long offset) { }
+#else /* !CONFIG_TICK_CPU_ACCOUNTING */
 extern void vtime_account(struct task_struct *tsk);
-#endif
+#endif /* !CONFIG_TICK_CPU_ACCOUNTING */
+
+#ifdef CONFIG_VIRT_CPU_ACCOUNTING
+extern void vtime_task_switch(struct task_struct *prev);
+extern void vtime_account_system(struct task_struct *tsk);
+extern void vtime_account_idle(struct task_struct *tsk);
+
+static inline void vtime_account_irq_enter(struct task_struct *tsk,
+					   unsigned long offset)
+{
+	/*
+	 * On hardirq entry We need to check which context we are interrupting.
+	 * Time may be accounted to either idle or system.
+	 */
+	if (offset == HARDIRQ_OFFSET) {
+		vtime_account(tsk);
+	} else {
+		/*
+		 * Softirqs never interrupt idle directly. Either the hardirq
+		 * already did and accounted the idle time or we run in
+		 * ksoftirqd and idle time was accounted on context switch.
+		 */
+		vtime_account_system(tsk);
+	}
+}
+
+static inline void vtime_account_irq_exit(struct task_struct *tsk,
+					  unsigned long offset)
+{
+	/* On hard|softirq exit we always account to hard|softirq cputime */
+	vtime_account_system(tsk);
+}
+#else /* !CONFIG_VIRT_CPU_ACCOUNTING */
+static inline void vtime_task_switch(struct task_struct *prev) { }
+static inline void vtime_account_system(struct task_struct *tsk) { }
+#endif /* CONFIG_VIRT_CPU_ACCOUNTING */
+
+#ifdef CONFIG_IRQ_TIME_ACCOUNTING
+static inline void vtime_account_irq_enter(struct task_struct *tsk,
+					   unsigned long offset)
+{
+	vtime_account(tsk);
+}
+
+static inline void vtime_account_irq_exit(struct task_struct *tsk,
+					  unsigned long offset)
+{
+	vtime_account(tsk);
+}
+#endif /* CONFIG_IRQ_TIME_ACCOUNTING */
+
 
 #if defined(CONFIG_TINY_RCU) || defined(CONFIG_TINY_PREEMPT_RCU)
 
@@ -160,11 +212,11 @@ extern void rcu_nmi_exit(void);
  * always balanced, so the interrupted value of ->hardirq_context
  * will always be restored.
  */
-#define __irq_enter()					\
-	do {						\
-		vtime_account(current);		\
-		add_preempt_count(HARDIRQ_OFFSET);	\
-		trace_hardirq_enter();			\
+#define __irq_enter()							\
+	do {								\
+		vtime_account_irq_enter(current, HARDIRQ_OFFSET);	\
+		add_preempt_count(HARDIRQ_OFFSET);			\
+		trace_hardirq_enter();					\
 	} while (0)
 
 /*
@@ -175,11 +227,11 @@ extern void irq_enter(void);
 /*
  * Exit irq context without processing softirqs:
  */
-#define __irq_exit()					\
-	do {						\
-		trace_hardirq_exit();			\
-		vtime_account(current);		\
-		sub_preempt_count(HARDIRQ_OFFSET);	\
+#define __irq_exit()							\
+	do {								\
+		trace_hardirq_exit();					\
+		vtime_account_irq_exit(current, HARDIRQ_OFFSET);	\
+		sub_preempt_count(HARDIRQ_OFFSET);			\
 	} while (0)
 
 /*

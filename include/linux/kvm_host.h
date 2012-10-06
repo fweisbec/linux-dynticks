@@ -21,7 +21,6 @@
 #include <linux/slab.h>
 #include <linux/rcupdate.h>
 #include <linux/ratelimit.h>
-#include <linux/kernel_stat.h>
 #include <asm/signal.h>
 
 #include <linux/kvm.h>
