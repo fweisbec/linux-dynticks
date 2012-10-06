@@ -131,17 +131,8 @@ extern void synchronize_irq(unsigned int irq);
 
 struct task_struct;
 
-#ifdef CONFIG_TICK_CPU_ACCOUNTING
-static inline void vtime_account(struct task_struct *tsk) { }
-static inline void vtime_account_irq_enter(struct task_struct *tsk,
-					   unsigned long offset) { }
-static inline void vtime_account_irq_exit(struct task_struct *tsk,
-					  unsigned long offset) { }
-#else /* !CONFIG_TICK_CPU_ACCOUNTING */
-extern void vtime_account(struct task_struct *tsk);
-#endif /* !CONFIG_TICK_CPU_ACCOUNTING */
-
 #ifdef CONFIG_VIRT_CPU_ACCOUNTING
+extern void vtime_account(struct task_struct *tsk);
 extern void vtime_task_switch(struct task_struct *prev);
 extern void vtime_account_system(struct task_struct *tsk);
 extern void vtime_account_idle(struct task_struct *tsk);
@@ -174,21 +165,28 @@ static inline void vtime_account_irq_exit(struct task_struct *tsk,
 #else /* !CONFIG_VIRT_CPU_ACCOUNTING */
 static inline void vtime_task_switch(struct task_struct *prev) { }
 static inline void vtime_account_system(struct task_struct *tsk) { }
-#endif /* CONFIG_VIRT_CPU_ACCOUNTING */
 
 #ifdef CONFIG_IRQ_TIME_ACCOUNTING
+extern void irqtime_account_irq(struct task_struct *tsk);
+
 static inline void vtime_account_irq_enter(struct task_struct *tsk,
 					   unsigned long offset)
 {
-	vtime_account(tsk);
+	irqtime_account_irq(tsk);
 }
 
 static inline void vtime_account_irq_exit(struct task_struct *tsk,
 					  unsigned long offset)
 {
-	vtime_account(tsk);
+	irqtime_account_irq(tsk);
 }
-#endif /* CONFIG_IRQ_TIME_ACCOUNTING */
+#else /* !CONFIG_IRQ_TIME_ACCOUNTING */
+static inline void vtime_account_irq_enter(struct task_struct *tsk,
+					   unsigned long offset) { }
+static inline void vtime_account_irq_exit(struct task_struct *tsk,
+					  unsigned long offset) { }
+#endif /* !CONFIG_IRQ_TIME_ACCOUNTING */
+#endif /* !CONFIG_VIRT_CPU_ACCOUNTING */
 
 
 #if defined(CONFIG_TINY_RCU) || defined(CONFIG_TINY_PREEMPT_RCU)
