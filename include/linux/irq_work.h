@@ -2,6 +2,7 @@
 #define _LINUX_IRQ_WORK_H
 
 #include <linux/llist.h>
+#include <asm/irq_work.h>
 
 struct irq_work {
 	unsigned long flags;

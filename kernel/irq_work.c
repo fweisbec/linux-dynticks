@@ -49,13 +49,6 @@ static bool irq_work_claim(struct irq_work *work)
 	return true;
 }
 
-void __weak arch_irq_work_raise(void)
-{
-	/*
-	 * Lame architectures will get the timer tick callback
-	 */
-}
-
 /*
  * Queue the entry and raise the IPI if needed.
  */

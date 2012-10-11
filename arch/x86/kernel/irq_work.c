@@ -18,13 +18,13 @@ void smp_irq_work_interrupt(struct pt_regs *regs)
 	irq_exit();
 }
 
+#ifdef CONFIG_X86_LOCAL_APIC
 void arch_irq_work_raise(void)
 {
-#ifdef CONFIG_X86_LOCAL_APIC
 	if (!cpu_has_apic)
 		return;
 
 	apic->send_IPI_self(IRQ_WORK_VECTOR);
 	apic_wait_icr_idle();
-#endif
 }
+#endif
