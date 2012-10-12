@@ -42,6 +42,7 @@
 #include <linux/notifier.h>
 #include <linux/rculist.h>
 #include <linux/poll.h>
+#include <linux/irq_work.h>
 
 #include <asm/uaccess.h>
 
@@ -1956,7 +1957,7 @@ int is_console_locked(void)
 static DEFINE_PER_CPU(int, printk_pending);
 static DEFINE_PER_CPU(char [PRINTK_BUF_SIZE], printk_sched_buf);
 
-void printk_tick(void)
+static void wake_up_klogd_work_func(struct irq_work *irq_work)
 {
 	if (__this_cpu_read(printk_pending)) {
 		int pending = __this_cpu_xchg(printk_pending, 0);
@@ -1969,17 +1970,16 @@ void printk_tick(void)
 	}
 }
 
-int printk_needs_cpu(int cpu)
-{
-	if (cpu_is_offline(cpu))
-		printk_tick();
-	return __this_cpu_read(printk_pending);
-}
+static struct irq_work wake_up_klogd_work = {
+		.func = wake_up_klogd_work_func
+};
 
 void wake_up_klogd(void)
 {
 	if (waitqueue_active(&log_wait))
 		this_cpu_or(printk_pending, PRINTK_PENDING_WAKEUP);
+
+	irq_work_queue(&wake_up_klogd_work, false);
 }
 
 static void console_cont_flush(char *text, size_t size)
