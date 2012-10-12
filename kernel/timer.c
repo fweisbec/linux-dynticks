@@ -1351,7 +1351,7 @@ void update_process_times(int user_tick)
 	rcu_check_callbacks(cpu, user_tick);
 	printk_tick();
 #ifdef CONFIG_IRQ_WORK
-	if (in_irq())
+	if (arch_irq_work_use_tick() && in_irq())
 		irq_work_run();
 #endif
 	scheduler_tick();

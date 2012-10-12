@@ -19,7 +19,7 @@ void smp_irq_work_interrupt(struct pt_regs *regs)
 }
 
 #ifdef CONFIG_X86_LOCAL_APIC
-void arch_irq_work_raise(void)
+void __arch_irq_work_raise(void)
 {
 	if (!cpu_has_apic)
 		return;
