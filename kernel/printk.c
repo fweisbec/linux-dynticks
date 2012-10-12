@@ -42,6 +42,8 @@
 #include <linux/notifier.h>
 #include <linux/rculist.h>
 #include <linux/poll.h>
+#include <linux/tick.h>
+#include <linux/irq_work.h>
 
 #include <asm/uaccess.h>
 
@@ -1976,10 +1978,50 @@ int printk_needs_cpu(int cpu)
 	return __this_cpu_read(printk_pending);
 }
 
+#ifdef CONFIG_IRQ_WORK
+static void wake_klogd_irq_work(struct irq_work *irq_work)
+{
+	printk_tick();
+}
+#endif
+
+/*
+ * When the tick is stopped, we need another way to wake up
+ * klogd safely.
+ */
+static void wake_up_klogd_nohz(void)
+{
+	/*
+	 * If irq work is not itself implemented using the tick
+	 * it's a safe and fast way to wake up the reader.
+	 */
+#ifdef CONFIG_IRQ_WORK
+	if (!arch_irq_work_use_tick()) {
+		static struct irq_work klogd_irq_work = {
+			.func = wake_klogd_irq_work
+		};
+
+		irq_work_queue(&klogd_irq_work);
+		return;
+	}
+#endif
+	/*
+	 * Our last resort in the case of idle is to bet
+	 * on the fact we haven't yet reached the last need_resched()
+	 * check before the CPU goes to halt. This way we go through
+	 * another idle loop to recheck printk_needs_cpu().
+	 */
+	if (is_idle_task(current))
+		set_need_resched();
+}
+
 void wake_up_klogd(void)
 {
 	if (waitqueue_active(&log_wait))
 		this_cpu_or(printk_pending, PRINTK_PENDING_WAKEUP);
+
+	if (tick_nohz_tick_stopped())
+		wake_up_klogd_nohz();
 }
 
 static void console_cont_flush(char *text, size_t size)
