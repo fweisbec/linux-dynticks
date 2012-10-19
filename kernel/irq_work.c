@@ -12,6 +12,8 @@
 #include <linux/percpu.h>
 #include <linux/hardirq.h>
 #include <linux/irqflags.h>
+#include <linux/tick.h>
+#include <linux/sched.h>
 #include <asm/processor.h>
 
 /*
@@ -52,7 +54,7 @@ static bool irq_work_claim(struct irq_work *work)
 /*
  * Queue the entry and raise the IPI if needed.
  */
-static void __irq_work_queue(struct irq_work *work)
+static void __irq_work_queue(struct irq_work *work, bool ipi)
 {
 	bool empty;
 
@@ -60,9 +62,16 @@ static void __irq_work_queue(struct irq_work *work)
 
 	empty = llist_add(&work->llnode, &__get_cpu_var(irq_work_list));
 	/* The list was empty, raise self-interrupt to start processing. */
-	if (empty)
-		arch_irq_work_raise();
-
+	if (empty) {
+		/*
+		 * If an IPI is requested, raise it right away. Otherwise wait
+		 * for the next tick unless it's stopped. Now if the arch uses
+		 * some other obscure way than IPI to raise an irq work, just raise
+		 * and don't think further.
+		 */
+		if (ipi || !arch_irq_work_has_ipi() || tick_nohz_tick_stopped())
+			arch_irq_work_raise();
+	}
 	preempt_enable();
 }
 
@@ -72,7 +81,7 @@ static void __irq_work_queue(struct irq_work *work)
  *
  * Can be re-enqueued while the callback is still in progress.
  */
-bool irq_work_queue(struct irq_work *work)
+bool irq_work_queue(struct irq_work *work, bool ipi)
 {
 	if (!irq_work_claim(work)) {
 		/*
@@ -81,10 +90,21 @@ bool irq_work_queue(struct irq_work *work)
 		return false;
 	}
 
-	__irq_work_queue(work);
+	__irq_work_queue(work, ipi);
 	return true;
 }
 EXPORT_SYMBOL_GPL(irq_work_queue);
+
+bool irq_work_needs_cpu(void)
+{
+	struct llist_head *this_list;
+
+	this_list = &__get_cpu_var(irq_work_list);
+	if (llist_empty(this_list))
+		return false;
+
+	return true;
+}
 
 /*
  * Run the irq_work entries on this cpu. Requires to be ran from hardirq

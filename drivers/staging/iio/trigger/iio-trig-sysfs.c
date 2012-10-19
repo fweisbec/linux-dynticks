@@ -105,7 +105,7 @@ static ssize_t iio_sysfs_trigger_poll(struct device *dev,
 	struct iio_trigger *trig = to_iio_trigger(dev);
 	struct iio_sysfs_trig *sysfs_trig = trig->private_data;
 
-	irq_work_queue(&sysfs_trig->work);
+	irq_work_queue(&sysfs_trig->work, true);
 
 	return count;
 }

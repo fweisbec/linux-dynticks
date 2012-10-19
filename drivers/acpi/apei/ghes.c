@@ -874,7 +874,7 @@ next:
 		ghes_clear_estatus(ghes);
 	}
 #ifdef CONFIG_ARCH_HAVE_NMI_SAFE_CMPXCHG
-	irq_work_queue(&ghes_proc_irq_work);
+	irq_work_queue(&ghes_proc_irq_work, true);
 #endif
 
 out:

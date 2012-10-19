@@ -4900,7 +4900,7 @@ static int __perf_event_overflow(struct perf_event *event,
 		ret = 1;
 		event->pending_kill = POLL_HUP;
 		event->pending_disable = 1;
-		irq_work_queue(&event->pending);
+		irq_work_queue(&event->pending, true);
 	}
 
 	if (event->overflow_handler)
@@ -4910,7 +4910,7 @@ static int __perf_event_overflow(struct perf_event *event,
 
 	if (event->fasync && event->pending_kill) {
 		event->pending_wakeup = 1;
-		irq_work_queue(&event->pending);
+		irq_work_queue(&event->pending, true);
 	}
 
 	return ret;

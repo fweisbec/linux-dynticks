@@ -128,7 +128,7 @@ static void kvm_perf_overflow_intr(struct perf_event *perf_event,
 		 * NMI context. Do it from irq work instead.
 		 */
 		if (!kvm_is_in_guest())
-			irq_work_queue(&pmc->vcpu->arch.pmu.irq_work);
+			irq_work_queue(&pmc->vcpu->arch.pmu.irq_work, true);
 		else
 			kvm_make_request(KVM_REQ_PMI, pmc->vcpu);
 	}

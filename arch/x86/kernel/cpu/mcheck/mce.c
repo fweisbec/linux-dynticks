@@ -549,7 +549,7 @@ static void mce_report_event(struct pt_regs *regs)
 		return;
 	}
 
-	irq_work_queue(&__get_cpu_var(mce_irq_work));
+	irq_work_queue(&__get_cpu_var(mce_irq_work), true);
 }
 
 /*
