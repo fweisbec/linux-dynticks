@@ -71,6 +71,17 @@ static void __irq_work_queue(struct irq_work *work, bool ipi)
 		 */
 		if (ipi || !arch_irq_work_has_ipi() || tick_nohz_tick_stopped())
 			arch_irq_work_raise();
+
+		/*
+		 * If we rely on the timer tick or some obscure way to run the work
+		 * while the CPU is in dyntick idle mode, we may not have an opportunity
+		 * to do so before a while. Let's just exit the idle loop and hope we
+		 * haven't yet reached the last need_resched() check before the CPU goes
+		 * to low power mode.
+		 */
+		if (!arch_irq_work_has_ipi() && tick_nohz_tick_stopped()
+		    && is_idle_task(current))
+			set_need_resched();
 	}
 	preempt_enable();
 }
