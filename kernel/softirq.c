@@ -326,7 +326,7 @@ void irq_enter(void)
 static inline void invoke_softirq(void)
 {
 	if (!force_irqthreads)
-		__do_softirq();
+		do_softirq_own_stack();
 	else
 		wakeup_softirqd();
 }
