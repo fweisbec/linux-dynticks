@@ -23,6 +23,10 @@ extern void irq_ctx_init(int cpu);
 
 #define __ARCH_HAS_DO_SOFTIRQ
 
+#ifdef CONFIG_X86_64
+# define __ARCH_IRQ_EXIT_ON_IRQ_STACK
+#endif
+
 #ifdef CONFIG_HOTPLUG_CPU
 #include <linux/cpumask.h>
 extern void fixup_irqs(void);
